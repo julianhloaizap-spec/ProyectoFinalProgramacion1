@@ -1,4 +1,6 @@
-package PACKAGE_NAME;
+public class Administrador extends Usuario {
 
-public class Administrativo {
+    public Administrador(String nombreUsuario, String idUsuario, String correoUsuario, String telefonoUsuario, String contraseniaUsuario) {
+        super(nombreUsuario, idUsuario, correoUsuario, telefonoUsuario, contraseniaUsuario);
+    }
 }
