@@ -1,4 +1,6 @@
-package PACKAGE_NAME;
+public class Recepcionista extends Usuario {
 
-public class Recepcionista {
+    public Recepcionista(String nombreUsuario, String idUsuario, String correoUsuario, String telefonoUsuario, String contraseniaUsuario) {
+        super(nombreUsuario, idUsuario, correoUsuario, telefonoUsuario, contraseniaUsuario);
+    }
 }
