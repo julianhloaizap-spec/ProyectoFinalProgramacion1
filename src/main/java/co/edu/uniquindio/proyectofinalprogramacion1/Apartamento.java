@@ -1,5 +1,7 @@
 package co.edu.uniquindio.proyectofinalprogramacion1;
 
+import java.util.ArrayList;
+
 public class Apartamento {
     //Atributos
     private String idApartamento;
@@ -9,17 +11,37 @@ public class Apartamento {
     private String caracteristicas;
     private int tarifaPersona;
     private EstadoOperativo estadoOperativo;
+    private ArrayList<Folio> listFolio;
+
 
     //Constructor
     public Apartamento(String idApartamento, String nombreApartamento, int numeroDormitorios, int capacidaMaxPersonas, String caracteristicas, int tarifaPersona, EstadoOperativo estadoOperativo) {
-        this.idApartamento = idApartamento;
+       if (idApartamento == null){
+           this.idApartamento = "";
+       } else {
+           this.idApartamento = idApartamento.trim();
+       }
         this.nombreApartamento = nombreApartamento;
         this.numeroDormitorios = numeroDormitorios;
         this.capacidaMaxPersonas = capacidaMaxPersonas;
         this.caracteristicas = caracteristicas;
         this.tarifaPersona = tarifaPersona;
-        this.estadoOperativo = estadoOperativo.PREPARADO;
+        this.estadoOperativo = EstadoOperativo.PREPARADO;
+        this.listFolio = new ArrayList<>();
+
     }
+    // Los datos del constructor se revisan antes de registrar el Apartamento.
+    public boolean esValido() {
+        return idApartamento != null && !idApartamento.isBlank()
+                && nombreApartamento != null && !nombreApartamento.isBlank()
+                && numeroDormitorios > 0
+                && capacidaMaxPersonas > 0
+                && caracteristicas != null && !caracteristicas.isBlank()
+                && tarifaPersona > 0
+                && estadoOperativo != null;
+    }
+
+
     //Getters and Setters
     public String getIdApartamento() {
         return idApartamento;
@@ -62,5 +84,8 @@ public class Apartamento {
     }
     public void setEstadoOperativo(EstadoOperativo estadoOperativo) {
         this.estadoOperativo = estadoOperativo;
+    }
+    public ArrayList<Folio> getListFolio() {
+        return listFolio;
     }
 }
