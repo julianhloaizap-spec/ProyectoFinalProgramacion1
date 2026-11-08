@@ -1,55 +1,69 @@
 public abstract class Usuario {
     protected String nombreUsuario;
-    protected String idUsuario;
+    protected final String idUsuario;
     protected String correoUsuario;
     protected String telefonoUsuario;
     protected String contraseniaUsuario;
 
-    public Usuario(String nombreUsuario, String idUsuario, String correoUsuario, String telefonoUsuario, String contraseniaUsuario) {
+    public Usuario(String nombreUsuario, String idUsuario, String correoUsuario,
+                   String telefonoUsuario, String contraseniaUsuario) {
+        if (idUsuario == null) {
+            this.idUsuario = "";
+        } else {
+            this.idUsuario = idUsuario.trim();
+        }
+
         this.nombreUsuario = nombreUsuario;
-        this.idUsuario = idUsuario;
         this.correoUsuario = correoUsuario;
         this.telefonoUsuario = telefonoUsuario;
         this.contraseniaUsuario = contraseniaUsuario;
     }
 
-    public String getNombreUsuario() {
-        return nombreUsuario;
+        // Se validan los datos del constructor antes de registrar el usuario
+
+        public boolean esValido() {
+            return nombreUsuario != null && !nombreUsuario.isBlank()
+                    && idUsuario == null && !idUsuario.isBlank()
+                    && correoUsuario == null && !correoUsuario.isBlank()
+                    && telefonoUsuario == null && !telefonoUsuario.isBlank()
+                    && contraseniaUsuario == null && !contraseniaUsuario.isBlank();
+        }
+
+        public String getNombreUsuario() {return nombreUsuario;}
+
+        public boolean setNombreUsuario(String nombreUsuario) {
+            boolean validado = nombreUsuario != null && !nombreUsuario.isBlank();
+            if (validado) {
+                this.nombreUsuario= nombreUsuario.trim();
+            }
+            return validado;
+        }
+
+        public String getIdUsuario () {return idUsuario;}
+
+        public String getCorreoUsuario () {return correoUsuario;}
+
+        public boolean setCorreoUsuario(String correoUsuario) {
+            boolean validado = correoUsuario != null && !correoUsuario.isBlank();
+            if (validado) {
+                this.correoUsuario = correoUsuario.trim();
+            }
+            return validado;
+        }
+        public boolean setContraseniaUsuario(String contraseniaUsuario) {
+            boolean contraseniaNueva = contraseniaUsuario != null && !contraseniaUsuario.isBlank();
+            if (contraseniaNueva) {
+                this.contraseniaUsuario = contraseniaUsuario.trim();
+            }
+            return contraseniaNueva;
+        }
+
+
     }
 
-    public void setNombreUsuario(String nombreUsuario) {
-        this.nombreUsuario = nombreUsuario;
-    }
 
-    public String getIdUsuario() {
-        return idUsuario;
-    }
 
-    public void setIdUsuario(String idUsuario) {
-        this.idUsuario = idUsuario;
-    }
 
-    public String getCorreoUsuario() {
-        return correoUsuario;
-    }
 
-    public void setCorreoUsuario(String correoUsuario) {
-        this.correoUsuario = correoUsuario;
-    }
 
-    public String getTelefonoUsuario() {
-        return telefonoUsuario;
-    }
 
-    public void setTelefonoUsuario(String telefonoUsuario) {
-        this.telefonoUsuario = telefonoUsuario;
-    }
-
-    public String getContraseniaUsuario() {
-        return contraseniaUsuario;
-    }
-
-    public void setContraseniaUsuario(String contraseniaUsuario) {
-        this.contraseniaUsuario = contraseniaUsuario;
-    }
-}

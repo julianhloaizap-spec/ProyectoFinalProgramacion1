@@ -1,32 +1,41 @@
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.LinkedList;
 
-public class Titular extends Usuario {
+public class Titular extends Usuario implements IReservable {
 
+    //Atributos
     private LocalDate fechaNacTitular;
     private String fotoTitular;
-    private LinkedList<Ocupante> listOcupantes;
+    private ArrayList<Ocupante> listOcupantes;
+    private ArrayList<Reserva> listReservas;
 
-    public Titular(String nombreUsuario, String idUsuario, String correoUsuario, String telefonoUsuario, String contraseniaUsuario, LocalDate fechaNacTitular, String fotoTitular) {
+    //constructor
+    public Titular(String nombreUsuario, String idUsuario, String correoUsuario, String telefonoUsuario,
+                   String contraseniaUsuario, LocalDate fechaNacTitular, String fotoTitular, ArrayList<Ocupante> listOcupantes, ArrayList<Reserva>) {
         super(nombreUsuario, idUsuario, correoUsuario, telefonoUsuario, contraseniaUsuario);
         this.fechaNacTitular = fechaNacTitular;
         this.fotoTitular = fotoTitular;
+        this.listOcupantes = new ArrayList<>();
+    }
+    //getters and setters
+    public LocalDate getFechaNacTitular() {return fechaNacTitular;}
+
+    public boolean setFechaNacTitular() {
+        boolean validado = fechaNacTitular != null && !fechaNacTitular.plusYears(18).isAfter(LocalDate.now());
+        if (validado) {
+            this.fechaNacTitular=fechaNacTitular;
+        }
+        return validado;
     }
 
-    public LocalDate getFechaNacTitular() {
-        return fechaNacTitular;
-    }
+    public String getFotoTitular() { return fotoTitular;}
 
-    public void setFechaNacTitular(LocalDate fechaNacTitular) {
-        this.fechaNacTitular = fechaNacTitular;
-    }
+    public ArrayList<Ocupante> getListOcupantes (){return new ArrayList<>(listOcupantes); }
 
-    public String getFotoTitular() {
-        return fotoTitular;
-    }
 
-    public void setFotoTitular(String fotoTitular) {
-        this.fotoTitular = fotoTitular;
+    @Override
+    public Reserva registrarReserva(String idReserva, LocalDate fechaReserva, Titular infoTitular,
+                                    EstadoReserva estadoReserva, LocalDate fechaEntrada, LocalDate fechaSalida) {
+        return null;
     }
 }

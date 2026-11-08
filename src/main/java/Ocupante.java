@@ -13,15 +13,22 @@ public class Ocupante {
         return nombreOcupante;
     }
 
-    public void setNombreOcupante(String nombreOcupante) {
-        this.nombreOcupante = nombreOcupante;
+    public boolean setNombreOcupante(String nombreOcupante) {
+        boolean nombreLimpio = nombreOcupante != null && !nombreOcupante.isBlank();
+        if (nombreLimpio) {
+            this.nombreOcupante = nombreOcupante.trim();
+        }
+        return nombreLimpio;
     }
 
     public LocalDate getFechaNacOcupante() {
         return fechaNacOcupante;
     }
 
-    public void setFechaNacOcupante(LocalDate fechaNacOcupante) {
-        this.fechaNacOcupante = fechaNacOcupante;
+    public boolean setFechaNacOcupante(LocalDate fechaNacOcupante) {
+        boolean validado = fechaNacOcupante != null && fechaNacOcupante.isBefore(LocalDate.now());
+        if (validado) {this.fechaNacOcupante = fechaNacOcupante;
+        }
+        return validado;
     }
 }
