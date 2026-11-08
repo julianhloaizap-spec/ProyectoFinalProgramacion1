@@ -1,5 +1,6 @@
-public interface IReservable {
-    public registrarReserva(Reserva newReserva) {
+import java.time.LocalDate;
 
-    }
+public interface IReservable {
+    public Reserva registrarReserva(String idReserva, LocalDate fechaReserva, Titular infoTitular,
+                                    EstadoReserva estadoReserva, LocalDate fechaEntrada, LocalDate fechaSalida);
 }
