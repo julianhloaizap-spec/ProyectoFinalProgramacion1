@@ -17,6 +17,12 @@ public class Titular extends Usuario implements IReservable {
         this.fotoTitular = fotoTitular;
         this.listOcupantes = new ArrayList<>();
     }
+
+    @Override
+    public boolean esValido() {
+        return super.esValido();
+    }
+
     //getters and setters
     public LocalDate getFechaNacTitular() {return fechaNacTitular;}
 
