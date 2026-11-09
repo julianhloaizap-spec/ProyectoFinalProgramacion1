@@ -9,7 +9,7 @@ public class Ocupante {
         this.fechaNacOcupante = fechaNacOcupante;
     }
 
-    public boolean esValido () {
+    public boolean esValido() {
         return nombreOcupante != null && !nombreOcupante.isBlank()
                 && fechaNacOcupante != null;
     }
@@ -32,7 +32,8 @@ public class Ocupante {
 
     public boolean setFechaNacOcupante(LocalDate fechaNacOcupante) {
         boolean validado = fechaNacOcupante != null && fechaNacOcupante.isBefore(LocalDate.now());
-        if (validado) {this.fechaNacOcupante = fechaNacOcupante;
+        if (validado) {
+            this.fechaNacOcupante = fechaNacOcupante;
         }
         return validado;
     }
