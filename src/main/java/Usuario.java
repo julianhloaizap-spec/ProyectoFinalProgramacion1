@@ -23,10 +23,10 @@ public abstract class Usuario {
 
         public boolean esValido() {
             return nombreUsuario != null && !nombreUsuario.isBlank()
-                    && idUsuario == null && !idUsuario.isBlank()
-                    && correoUsuario == null && !correoUsuario.isBlank()
-                    && telefonoUsuario == null && !telefonoUsuario.isBlank()
-                    && contraseniaUsuario == null && !contraseniaUsuario.isBlank();
+                    && idUsuario != null && !idUsuario.isBlank()
+                    && correoUsuario != null && !correoUsuario.isBlank()
+                    && telefonoUsuario != null && !telefonoUsuario.isBlank()
+                    && contraseniaUsuario != null && !contraseniaUsuario.isBlank();
         }
 
         public String getNombreUsuario() {return nombreUsuario;}

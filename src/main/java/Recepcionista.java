@@ -10,8 +10,12 @@ public class Recepcionista extends Usuario implements IReservable {
     }
 
     @Override
+    public boolean esValido() {return super.esValido();}
+
+    @Override
     public Reserva registrarReserva(String idReserva, LocalDate fechaReserva, Titular infoTitular,
                                     EstadoReserva estadoReserva, LocalDate fechaEntrada, LocalDate fechaSalida) {
+
         return null;
     }
 }

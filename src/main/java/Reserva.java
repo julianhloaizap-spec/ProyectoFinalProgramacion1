@@ -1,20 +1,22 @@
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 public class Reserva {
     private String idReserva;
-    private LocalDate fechaReserva;
+    private final LocalDateTime fechaReserva;
     private Titular infoTitular;
     private EstadoReserva estadoReserva;
-    private LocalDate fechaEntrada;
-    private LocalDate fechaSalida;
+    private LocalDateTime fechaEntrada;
+    private LocalDateTime fechaSalida;
 
     private Folio folio;
 
-    public Reserva(String idReserva, LocalDate fechaReserva, Titular infoTitular, EstadoReserva estadoReserva, LocalDate fechaEntrada, LocalDate fechaSalida, Folio folio) {
+    public Reserva(String idReserva, LocalDateTime fechaReserva, Titular infoTitular, EstadoReserva estadoReserva,
+                   LocalDateTime fechaEntrada, LocalDateTime fechaSalida, Folio folio) {
         this.idReserva = idReserva;
         this.fechaReserva = fechaReserva;
         this.infoTitular = infoTitular;
-        this.estadoReserva = estadoReserva;
+        this.estadoReserva = EstadoReserva.PENDIENTE;
         this.fechaEntrada = fechaEntrada;
         this.fechaSalida = fechaSalida;
         this.folio = folio;
@@ -24,13 +26,7 @@ public class Reserva {
         return idReserva;
     }
 
-    public LocalDate getFechaReserva() {return fechaReserva;}
-
-    public boolean setFechaReserva(LocalDate fechaReserva) {
-
-
-        this.fechaReserva = fechaReserva;
-    }
+    public LocalDateTime getFechaReserva() {return fechaReserva;}
 
     public Titular getInfoTitular() {
         return infoTitular;
@@ -48,19 +44,19 @@ public class Reserva {
         return validado;
     }
 
-    public LocalDate getFechaEntrada() {
-        return fechaEntrada;
+    public LocalDateTime getFechaEntrada() { return fechaEntrada;}
+
+    public boolean setFechaEntrada(LocalDateTime fechaEntrada) {
+        boolean validado = fechaEntrada != null && fechaEntrada.isAfter(this.fechaReserva);
+        if (validado) {
+            this.fechaEntrada = fechaEntrada;
+        }
+        return validado;
     }
 
-    public void setFechaEntrada(LocalDate fechaEntrada) {
-        this.fechaEntrada = fechaEntrada;
-    }
+    public LocalDateTime getFechaSalida() {return fechaSalida;}
 
-    public LocalDate getFechaSalida() {
-        return fechaSalida;
-    }
-
-    public boolean setFechaSalida(LocalDate fechaSalida, LocalDate fechaEntrada) {
+    public boolean setFechaSalida(LocalDateTime fechaSalida, LocalDateTime fechaEntrada) {
         boolean validado= fechaSalida != null && fechaEntrada != null && fechaSalida.isAfter(this.fechaEntrada);
         if (validado) {
             this.fechaSalida = fechaSalida;

@@ -9,6 +9,11 @@ public class Ocupante {
         this.fechaNacOcupante = fechaNacOcupante;
     }
 
+    public boolean esValido () {
+        return nombreOcupante != null && !nombreOcupante.isBlank()
+                && fechaNacOcupante != null;
+    }
+
     public String getNombreOcupante() {
         return nombreOcupante;
     }

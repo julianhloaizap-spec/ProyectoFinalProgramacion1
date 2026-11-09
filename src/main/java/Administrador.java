@@ -6,8 +6,6 @@ public class Administrador extends Usuario {
     private ArrayList<Temporada> listTemporadas;
 
     // Consructor
-
-
     public Administrador(String nombreUsuario, String idUsuario, String correoUsuario, String telefonoUsuario, String contraseniaUsuario,
                          ArrayList<Recepcionista> listRecepcionistas, ArrayList<Apartamento> listApartamentos, ArrayList<Temporada> listTemporadas) {
         super(nombreUsuario, idUsuario, correoUsuario, telefonoUsuario, contraseniaUsuario);
@@ -15,25 +13,13 @@ public class Administrador extends Usuario {
         this.listApartamentos = new ArrayList<>();
         this.listTemporadas = new ArrayList<>();    }
 
-    public ArrayList<Recepcionista> getListRecepcionistas() {
-        return listRecepcionistas;
-    }
+    @Override
+    public boolean esValido(){return super.esValido();}
 
+    public ArrayList<Recepcionista> getListRecepcionistas() { return new ArrayList<>(listRecepcionistas);}
 
+    public ArrayList<Apartamento> getListApartamentos() { return new ArrayList<>(listApartamentos);}
 
-    public ArrayList<Apartamento> getListApartamentos() {
-        return listApartamentos;
-    }
+    public ArrayList<Temporada> getListTemporadas() { return new ArrayList<>(listTemporadas);}
 
-    public void setListApartamentos(ArrayList<Apartamento> listApartamentos) {
-        this.listApartamentos = listApartamentos;
-    }
-
-    public ArrayList<Temporada> getListTemporadas() {
-        return listTemporadas;
-    }
-
-    public void setListTemporadas(ArrayList<Temporada> listTemporadas) {
-        this.listTemporadas = listTemporadas;
-    }
 }
