@@ -7,10 +7,17 @@ public class Recepcionista extends Usuario implements IReservable {
 
     public Recepcionista(String nombreUsuario, String idUsuario, String correoUsuario, String telefonoUsuario, String contraseniaUsuario, ArrayList<Reserva> listReservas) {
         super(nombreUsuario, idUsuario, correoUsuario, telefonoUsuario, contraseniaUsuario);
+        this.listReservas = new ArrayList<>();
+    }
+
+    public ArrayList<Reserva> getListReservas() {
+        this.listReservas = new ArrayList<>();
     }
 
     @Override
-    public boolean esValido() {return super.esValido();}
+    public boolean esValido() {
+        return super.esValido();
+    }
 
     @Override
     public Reserva registrarReserva(String idReserva, LocalDate fechaReserva, Titular infoTitular,

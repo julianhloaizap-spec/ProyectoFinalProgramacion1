@@ -26,7 +26,9 @@ public class Reserva {
         return idReserva;
     }
 
-    public LocalDateTime getFechaReserva() {return fechaReserva;}
+    public LocalDateTime getFechaReserva() {
+        return fechaReserva;
+    }
 
     public Titular getInfoTitular() {
         return infoTitular;
@@ -44,7 +46,9 @@ public class Reserva {
         return validado;
     }
 
-    public LocalDateTime getFechaEntrada() { return fechaEntrada;}
+    public LocalDateTime getFechaEntrada() {
+        return fechaEntrada;
+    }
 
     public boolean setFechaEntrada(LocalDateTime fechaEntrada) {
         boolean validado = fechaEntrada != null && fechaEntrada.isAfter(this.fechaReserva);
@@ -54,17 +58,19 @@ public class Reserva {
         return validado;
     }
 
-    public LocalDateTime getFechaSalida() {return fechaSalida;}
+    public LocalDateTime getFechaSalida() {
+        return fechaSalida;
+    }
 
     public boolean setFechaSalida(LocalDateTime fechaSalida, LocalDateTime fechaEntrada) {
-        boolean validado= fechaSalida != null && fechaEntrada != null && fechaSalida.isAfter(this.fechaEntrada);
+        boolean validado = fechaSalida != null && fechaEntrada != null && fechaSalida.isAfter(this.fechaEntrada);
         if (validado) {
             this.fechaSalida = fechaSalida;
         }
 
     }
 
-    public static int saldoPagar (Folio folio) {
+    public static int saldoPagar(Folio folio) {
 
     }
 }

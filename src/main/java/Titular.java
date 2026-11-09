@@ -24,19 +24,25 @@ public class Titular extends Usuario implements IReservable {
     }
 
     //getters and setters
-    public LocalDate getFechaNacTitular() {return fechaNacTitular;}
+    public LocalDate getFechaNacTitular() {
+        return fechaNacTitular;
+    }
 
     public boolean setFechaNacTitular() {
         boolean validado = fechaNacTitular != null && !fechaNacTitular.plusYears(18).isAfter(LocalDate.now());
         if (validado) {
-            this.fechaNacTitular=fechaNacTitular;
+            this.fechaNacTitular = fechaNacTitular;
         }
         return validado;
     }
 
-    public String getFotoTitular() { return fotoTitular;}
+    public String getFotoTitular() {
+        return fotoTitular;
+    }
 
-    public ArrayList<Ocupante> getListOcupantes (){return new ArrayList<>(listOcupantes); }
+    public ArrayList<Ocupante> getListOcupantes() {
+        return new ArrayList<>(listOcupantes);
+    }
 
 
     @Override
