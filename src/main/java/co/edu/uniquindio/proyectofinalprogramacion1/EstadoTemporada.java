@@ -7,17 +7,14 @@ public enum EstadoTemporada {
 
     /*Decidimos asignar un porcentaje a los estados de temporada para poder asi asignar un  valor al apartamento*/
 
-    private int porcentajeTemporada;
+    private final int porcentajePorDefecto;
 
     // constructor
-    EstadoTemporada (int porcentajeTemporada){
-        this.porcentajeTemporada = porcentajeTemporada;
+    EstadoTemporada(int porcentajePorDefecto) {
+        this.porcentajePorDefecto = porcentajePorDefecto;
     }
-    // getter and setter
-    public int getPorcentajeTemporada() {
-        return porcentajeTemporada;
-    }
-    public void setPorcentajeTemporada(int porcentajeTemporada) {
-        this.porcentajeTemporada = porcentajeTemporada;
+    //getter
+    public int getPorcentajePorDefecto() {
+        return porcentajePorDefecto;
     }
 }
