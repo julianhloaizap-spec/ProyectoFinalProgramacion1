@@ -56,3 +56,46 @@ class ReservaTest {
         LOG.info("Finalizando prueba transicionesDeEstadoPermitidasYBloqueadas...");
     }
 
+    // Verifica que al crear la reserva se congelen el valor total, la comisión externa (15%)
+    // y la política de cancelación, sin verse afectados por cambios posteriores de tarifas.
+    @DisplayName("Prueba congelamiento de tarifas, comisión externa y política de cancelación")
+    @Test
+    void valorYPoliticaQuedanCongeladosAlCrearReserva() {
+        LOG.info("Iniciando prueba valorYPoliticaQuedanCongeladosAlCrearReserva...");
+        LocalDate entrada = LocalDate.now().plusDays(10);
+        LocalDate salida = LocalDate.now().plusDays(13);
+
+        Reserva r = new Reserva(titular, apartamento, ocupantes, entrada, salida, Canal.EXTERNA, "EXT-999");
+        PoliticaCancelacion politicaInicial = new PoliticaCancelacion(7, 2, 50, 100);
+        r.liquidarYCongelarValor(temporadas, politicaInicial);
+
+        apartamento.setTarifaTemporada(EstadoTemporada.BAJA, 250000);
+        politicaInicial.setPorcentajeRetencionMedia(90);
+
+        Assertions.assertEquals(300000, r.getValorTotalCongelado());
+        Assertions.assertEquals(45000, r.getComisionPlataforma());
+        Assertions.assertEquals(50, r.getPoliticaCongelada().getPorcentajeRetencionMedia());
+        LOG.info("Valor congelado: $" + r.getValorTotalCongelado() + " | Comisión: $" + r.getComisionPlataforma());
+        LOG.info("Finalizando prueba valorYPoliticaQuedanCongeladosAlCrearReserva...");
+    }
+
+    // Verifica el cálculo de dinero a devolver según la antelación de la cancelación:
+    // >7 días devuelve 100%, entre 2 y 7 días retiene 50%, y <48 horas retiene 100%.
+    @DisplayName("Prueba cálculo de devolución según política de cancelación")
+    @Test
+    void calculoDevolucionPorPoliticaDeCancelacion() {
+        LOG.info("Iniciando prueba calculoDevolucionPorPoliticaDeCancelacion...");
+        LocalDate entrada = LocalDate.now().plusDays(10);
+        LocalDate salida = LocalDate.now().plusDays(13);
+
+        Reserva r = new Reserva(titular, apartamento, ocupantes, entrada, salida, Canal.DIRECTA, "");
+        r.liquidarYCongelarValor(temporadas, new PoliticaCancelacion());
+        r.getFolio().registrarPago(new Pago(MedioPago.TARJETA, 300000));
+
+        Assertions.assertEquals(300000, r.previsualizarDevolucionCancelacion(entrada.minusDays(8)));
+        Assertions.assertEquals(150000, r.previsualizarDevolucionCancelacion(entrada.minusDays(5)));
+        Assertions.assertEquals(0, r.previsualizarDevolucionCancelacion(entrada.minusDays(1)));
+        LOG.info("Finalizando prueba calculoDevolucionPorPoliticaDeCancelacion...");
+    }
+}
+
