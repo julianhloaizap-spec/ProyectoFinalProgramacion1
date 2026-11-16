@@ -1,7 +1,9 @@
 package co.edu.uniquindio;
 
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
+import java.io.File;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 
@@ -15,6 +17,7 @@ public class PanelLogin extends JPanel {
 
     private JTextField txtRegNombre, txtRegDoc, txtRegCorreo, txtRegTelefono, txtRegFechaNac, txtRegFoto;
     private JPasswordField txtRegPass;
+    private JLabel lblPreviaFoto;
 
     public PanelLogin(Alojamiento alojamiento, VentanaPrincipal ventanaPrincipal) {
         this.alojamiento = alojamiento;
@@ -75,8 +78,15 @@ public class PanelLogin extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setBorder(BorderFactory.createTitledBorder("Registro de Nuevo Huésped (Titular)"));
 
-        JPanel form = new JPanel(new GridLayout(8, 2, 8, 8));
-        form.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        // Vista previa superior de la foto de perfil
+        JPanel panelSuperiorFoto = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        lblPreviaFoto = new JLabel("Sin foto", SwingConstants.CENTER);
+        lblPreviaFoto.setPreferredSize(new Dimension(115, 115));
+        lblPreviaFoto.setBorder(BorderFactory.createTitledBorder("Vista Previa"));
+        panelSuperiorFoto.add(lblPreviaFoto);
+
+        JPanel form = new JPanel(new GridLayout(7, 2, 8, 8));
+        form.setBorder(BorderFactory.createEmptyBorder(5, 15, 10, 15));
 
         txtRegNombre = new JTextField();
         txtRegDoc = new JTextField();
@@ -88,12 +98,7 @@ public class PanelLogin extends JPanel {
         txtRegFoto.setEditable(false);
 
         JButton btnSeleccionarFoto = new JButton("Adjuntar Foto (Opcional)");
-        btnSeleccionarFoto.addActionListener(e -> {
-            JFileChooser chooser = new JFileChooser();
-            if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-                txtRegFoto.setText(chooser.getSelectedFile().getAbsolutePath());
-            }
-        });
+        btnSeleccionarFoto.addActionListener(e -> seleccionarFotoRegistro());
 
         form.add(new JLabel("Nombre Completo:")); form.add(txtRegNombre);
         form.add(new JLabel("Documento de Identidad:")); form.add(txtRegDoc);
@@ -107,9 +112,42 @@ public class PanelLogin extends JPanel {
         btnRegistrar.setFont(new Font("SansSerif", Font.BOLD, 13));
         btnRegistrar.addActionListener(e -> registrarNuevoHuesped());
 
+        panel.add(panelSuperiorFoto, BorderLayout.NORTH);
         panel.add(form, BorderLayout.CENTER);
         panel.add(btnRegistrar, BorderLayout.SOUTH);
         return panel;
+    }
+
+    private void seleccionarFotoRegistro() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Seleccionar foto de perfil");
+        chooser.setFileFilter(new FileNameExtensionFilter("Imágenes (JPG, PNG, GIF)", "jpg", "jpeg", "png", "gif"));
+
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            String ruta = chooser.getSelectedFile().getAbsolutePath();
+            txtRegFoto.setText(ruta);
+            actualizarPreviaFoto(ruta);
+        }
+    }
+
+    private void actualizarPreviaFoto(String ruta) {
+        if (ruta == null || ruta.isBlank()) {
+            lblPreviaFoto.setIcon(null);
+            lblPreviaFoto.setText("Sin foto");
+            return;
+        }
+        File archivo = new File(ruta);
+        if (archivo.exists()) {
+            ImageIcon icono = new ImageIcon(archivo.getAbsolutePath());
+            if (icono.getIconWidth() > 0) {
+                Image imgEscalada = icono.getImage().getScaledInstance(90, 90, Image.SCALE_SMOOTH);
+                lblPreviaFoto.setIcon(new ImageIcon(imgEscalada));
+                lblPreviaFoto.setText("");
+                return;
+            }
+        }
+        lblPreviaFoto.setIcon(null);
+        lblPreviaFoto.setText("No válida");
     }
 
     private void procesarLogin() {
@@ -148,6 +186,7 @@ public class PanelLogin extends JPanel {
                 txtRegCorreo.setText("");
                 txtRegPass.setText("");
                 txtRegFoto.setText("");
+                actualizarPreviaFoto("");
             } else {
                 JOptionPane.showMessageDialog(this, "Ya existe un usuario registrado con ese documento.", "Error", JOptionPane.ERROR_MESSAGE);
             }

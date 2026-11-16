@@ -1,9 +1,13 @@
 package co.edu.uniquindio;
 
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.io.File;
+import java.net.URL;
 import java.time.LocalDate;
+import java.util.ArrayList;
 
 public class PanelAdministrador extends JPanel {
 
@@ -20,6 +24,14 @@ public class PanelAdministrador extends JPanel {
     private JTable tablaAptos;
     private DefaultTableModel modeloAptos;
     private JTextField txtAptoNombre, txtAptoDorm, txtAptoCap, txtAptoCaract, txtTarifaBaja, txtTarifaMedia, txtTarifaAlta;
+
+    // Gestión de fotos de apartamentos (sin Map)
+    private DefaultListModel<String> modeloListaFotosApto;
+    private JList<String> listaFotosApto;
+    private final ArrayList<String> rutasFotosMostradas = new ArrayList<>();
+    private final ArrayList<String> rutasFotosNuevoApto = new ArrayList<>();
+    private JLabel lblContextoFotos;
+    private JLabel lblVistaPreviaFotoApto;
 
     private JTextField txtTempNombre, txtTempInicio, txtTempFin;
     private JComboBox<EstadoTemporada> cbTipoTemp;
@@ -125,14 +137,24 @@ public class PanelAdministrador extends JPanel {
     private JPanel crearTabApartamentos() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
 
-        String[] cols = {"Código", "Nombre", "Dorm.", "Cap.", "Tarifa Baja", "Tarifa Media", "Tarifa Alta", "Activo"};
+        String[] cols = {"Código", "Nombre", "Dorm.", "Cap.", "Tarifa Baja", "Tarifa Media", "Tarifa Alta", "Fotos", "Activo"};
         modeloAptos = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
         tablaAptos = new JTable(modeloAptos);
+        tablaAptos.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tablaAptos.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                actualizarPanelFotosSegunSeleccion();
+            }
+        });
         panel.add(new JScrollPane(tablaAptos), BorderLayout.CENTER);
 
-        JPanel form = new JPanel(new GridLayout(4, 4, 6, 6));
+        // Panel inferior dividido: izquierda datos del apartamento, derecha galería de fotos
+        JPanel inferior = new JPanel(new BorderLayout(10, 10));
+        inferior.setPreferredSize(new Dimension(0, 235));
+
+        JPanel form = new JPanel(new GridLayout(5, 4, 6, 6));
         form.setBorder(BorderFactory.createTitledBorder("Crear / Configurar Apartamentos (Código Automático)"));
 
         txtAptoNombre = new JTextField();
@@ -151,14 +173,20 @@ public class PanelAdministrador extends JPanel {
                         Integer.parseInt(txtAptoDorm.getText().trim()),
                         Integer.parseInt(txtAptoCap.getText().trim()),
                         txtAptoCaract.getText(),
-                        Integer.parseInt(txtTarifaBaja.getText().trim())
+                        Integer.parseInt(txtTarifaBaja.getText().trim()),
+                        rutasFotosNuevoApto
                 );
                 a.setTarifaTemporada(EstadoTemporada.MEDIA, Integer.parseInt(txtTarifaMedia.getText().trim()));
                 a.setTarifaTemporada(EstadoTemporada.ALTA, Integer.parseInt(txtTarifaAlta.getText().trim()));
 
                 if (adminActual.crearApartamento(alojamiento, a)) {
-                    JOptionPane.showMessageDialog(this, "Apartamento creado con código: " + a.getIdApartamento());
+                    JOptionPane.showMessageDialog(this, "Apartamento creado con código: " + a.getIdApartamento()
+                            + " (" + a.getListFotos().size() + " foto(s) asociada(s)).");
+                    txtAptoNombre.setText("");
+                    rutasFotosNuevoApto.clear();
+                    tablaAptos.clearSelection();
                     refrescarTablas();
+                    actualizarPanelFotosSegunSeleccion();
                 } else {
                     JOptionPane.showMessageDialog(this, "Datos inválidos.", "Error", JOptionPane.ERROR_MESSAGE);
                 }
@@ -181,6 +209,12 @@ public class PanelAdministrador extends JPanel {
             }
         });
 
+        JButton btnModoNuevo = new JButton("Limpiar Selección");
+        btnModoNuevo.addActionListener(e -> {
+            tablaAptos.clearSelection();
+            actualizarPanelFotosSegunSeleccion();
+        });
+
         form.add(new JLabel("Nombre:")); form.add(txtAptoNombre);
         form.add(new JLabel("Dormitorios:")); form.add(txtAptoDorm);
         form.add(new JLabel("Capacidad Máx:")); form.add(txtAptoCap);
@@ -188,10 +222,183 @@ public class PanelAdministrador extends JPanel {
         form.add(new JLabel("Tarifa Temp. Baja ($):")); form.add(txtTarifaBaja);
         form.add(new JLabel("Tarifa Temp. Media ($):")); form.add(txtTarifaMedia);
         form.add(new JLabel("Tarifa Temp. Alta ($):")); form.add(txtTarifaAlta);
+        form.add(new JLabel("")); form.add(new JLabel(""));
         form.add(btnCrear); form.add(btnEliminar);
+        form.add(btnModoNuevo); form.add(new JLabel(""));
 
-        panel.add(form, BorderLayout.SOUTH);
+        // Panel derecho: Gestión y vista previa de fotografías
+        JPanel panelFotos = new JPanel(new BorderLayout(6, 6));
+        panelFotos.setBorder(BorderFactory.createTitledBorder("Fotografías del Apartamento"));
+        panelFotos.setPreferredSize(new Dimension(370, 0));
+
+        lblContextoFotos = new JLabel("Destino: Nuevo Apartamento");
+        lblContextoFotos.setFont(new Font("SansSerif", Font.BOLD, 11));
+        panelFotos.add(lblContextoFotos, BorderLayout.NORTH);
+
+        modeloListaFotosApto = new DefaultListModel<>();
+        listaFotosApto = new JList<>(modeloListaFotosApto);
+        listaFotosApto.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        listaFotosApto.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                mostrarPreviaFotoSeleccionada();
+            }
+        });
+
+        lblVistaPreviaFotoApto = new JLabel("Sin vista previa", SwingConstants.CENTER);
+        lblVistaPreviaFotoApto.setPreferredSize(new Dimension(135, 135));
+        lblVistaPreviaFotoApto.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+
+        JPanel centroFotos = new JPanel(new BorderLayout(6, 0));
+        centroFotos.add(new JScrollPane(listaFotosApto), BorderLayout.CENTER);
+        centroFotos.add(lblVistaPreviaFotoApto, BorderLayout.EAST);
+        panelFotos.add(centroFotos, BorderLayout.CENTER);
+
+        JPanel botonesFotos = new JPanel(new GridLayout(1, 2, 6, 0));
+        JButton btnAgregarFotos = new JButton("+ Agregar Foto(s)");
+        btnAgregarFotos.addActionListener(e -> agregarFotosApartamento());
+        JButton btnQuitarFoto = new JButton("- Quitar Foto");
+        btnQuitarFoto.addActionListener(e -> quitarFotoApartamento());
+        botonesFotos.add(btnAgregarFotos);
+        botonesFotos.add(btnQuitarFoto);
+        panelFotos.add(botonesFotos, BorderLayout.SOUTH);
+
+        inferior.add(form, BorderLayout.CENTER);
+        inferior.add(panelFotos, BorderLayout.EAST);
+        panel.add(inferior, BorderLayout.SOUTH);
+
         return panel;
+    }
+
+    private Apartamento obtenerApartamentoSeleccionadoTabla() {
+        int fila = tablaAptos.getSelectedRow();
+        if (fila < 0) return null;
+        String codigo = (String) modeloAptos.getValueAt(fila, 0);
+        for (Apartamento a : alojamiento.getListApartamentos()) {
+            if (a.getIdApartamento().equals(codigo)) {
+                return a;
+            }
+        }
+        return null;
+    }
+
+    private void actualizarPanelFotosSegunSeleccion() {
+        Apartamento seleccionado = obtenerApartamentoSeleccionadoTabla();
+        modeloListaFotosApto.clear();
+        rutasFotosMostradas.clear();
+
+        ArrayList<String> fuente;
+        if (seleccionado != null) {
+            lblContextoFotos.setText("Fotos de: " + seleccionado.getIdApartamento() + " — " + seleccionado.getNombreApartamento());
+            fuente = seleccionado.getListFotos();
+        } else {
+            lblContextoFotos.setText("Destino: Nuevo Apartamento (antes de crear)");
+            fuente = rutasFotosNuevoApto;
+        }
+
+        for (String ruta : fuente) {
+            rutasFotosMostradas.add(ruta);
+            modeloListaFotosApto.addElement(new File(ruta).getName());
+        }
+
+        if (!rutasFotosMostradas.isEmpty()) {
+            listaFotosApto.setSelectedIndex(0);
+        } else {
+            lblVistaPreviaFotoApto.setIcon(null);
+            lblVistaPreviaFotoApto.setText("Sin fotos");
+        }
+    }
+
+    private void mostrarPreviaFotoSeleccionada() {
+        int idx = listaFotosApto.getSelectedIndex();
+        if (idx < 0 || idx >= rutasFotosMostradas.size()) {
+            lblVistaPreviaFotoApto.setIcon(null);
+            lblVistaPreviaFotoApto.setText("Sin vista previa");
+            return;
+        }
+        cargarImagenEnLabel(lblVistaPreviaFotoApto, rutasFotosMostradas.get(idx), 125, 125, "No encontrada");
+    }
+
+    private void agregarFotosApartamento() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Seleccionar fotografías del apartamento");
+        chooser.setMultiSelectionEnabled(true);
+        chooser.setFileFilter(new FileNameExtensionFilter("Imágenes (JPG, PNG, GIF)", "jpg", "jpeg", "png", "gif"));
+
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File[] archivos = chooser.getSelectedFiles();
+            Apartamento seleccionado = obtenerApartamentoSeleccionadoTabla();
+
+            for (File f : archivos) {
+                String ruta = f.getAbsolutePath();
+                if (seleccionado != null) {
+                    seleccionado.agregarFoto(ruta);
+                } else if (!rutasFotosNuevoApto.contains(ruta)) {
+                    rutasFotosNuevoApto.add(ruta);
+                }
+            }
+
+            if (seleccionado != null) {
+                int filaActual = tablaAptos.getSelectedRow();
+                refrescarTablas();
+                if (filaActual >= 0 && filaActual < tablaAptos.getRowCount()) {
+                    tablaAptos.setRowSelectionInterval(filaActual, filaActual);
+                }
+            }
+            actualizarPanelFotosSegunSeleccion();
+        }
+    }
+
+    private void quitarFotoApartamento() {
+        int idx = listaFotosApto.getSelectedIndex();
+        if (idx < 0 || idx >= rutasFotosMostradas.size()) {
+            JOptionPane.showMessageDialog(this, "Seleccione una foto de la lista para quitar.", "Atención", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        String rutaEliminar = rutasFotosMostradas.get(idx);
+        Apartamento seleccionado = obtenerApartamentoSeleccionadoTabla();
+
+        if (seleccionado != null) {
+            seleccionado.eliminarFoto(rutaEliminar);
+            int filaActual = tablaAptos.getSelectedRow();
+            refrescarTablas();
+            if (filaActual >= 0 && filaActual < tablaAptos.getRowCount()) {
+                tablaAptos.setRowSelectionInterval(filaActual, filaActual);
+            }
+        } else {
+            rutasFotosNuevoApto.remove(rutaEliminar);
+        }
+
+        actualizarPanelFotosSegunSeleccion();
+    }
+
+    private void cargarImagenEnLabel(JLabel label, String rutaFoto, int ancho, int alto, String mensajeVacio) {
+        if (rutaFoto == null || rutaFoto.isBlank()) {
+            label.setIcon(null);
+            label.setText(mensajeVacio);
+            return;
+        }
+
+        ImageIcon icono = null;
+        File archivo = new File(rutaFoto);
+
+        if (archivo.exists()) {
+            icono = new ImageIcon(archivo.getAbsolutePath());
+        } else {
+            URL recurso = getClass().getResource("/" + rutaFoto.replaceFirst("^/", ""));
+            if (recurso != null) {
+                icono = new ImageIcon(recurso);
+            }
+        }
+
+        if (icono != null && icono.getIconWidth() > 0) {
+            Image imgEscalada = icono.getImage().getScaledInstance(ancho, alto, Image.SCALE_SMOOTH);
+            label.setIcon(new ImageIcon(imgEscalada));
+            label.setText("");
+        } else {
+            label.setIcon(null);
+            label.setText("No encontrada");
+        }
     }
 
     private JPanel crearTabConfiguracion() {
@@ -354,6 +561,7 @@ public class PanelAdministrador extends JPanel {
                     "$" + a.getTarifaPorTemporada(EstadoTemporada.BAJA),
                     "$" + a.getTarifaPorTemporada(EstadoTemporada.MEDIA),
                     "$" + a.getTarifaPorTemporada(EstadoTemporada.ALTA),
+                    a.getListFotos().size() + " foto(s)",
                     a.isActivo() ? "Sí" : "No"
             });
         }

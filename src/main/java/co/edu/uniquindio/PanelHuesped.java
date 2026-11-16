@@ -21,6 +21,16 @@ public class PanelHuesped extends JPanel {
     private JTextField txtBusqEntrada, txtBusqSalida, txtBusqPersonas;
     private JTable tablaDisponibles;
     private DefaultTableModel modeloDisponibles;
+    private final ArrayList<Apartamento> apartamentosDisponiblesActuales = new ArrayList<>();
+
+    // Galería integrada junto a la cotización
+    private JLabel lblNombreAptoGaleria;
+    private JLabel lblFotoApto;
+    private JLabel lblContadorFotosApto;
+    private JButton btnFotoAnterior, btnFotoSiguiente;
+    private ArrayList<String> fotosAptoSeleccionado = new ArrayList<>();
+    private int indiceFotoApto = 0;
+
     private JTextField txtOcupNombre, txtOcupFechaNac;
     private DefaultListModel<String> modeloListaOcupantes;
     private final ArrayList<Ocupante> ocupantesReservaActual = new ArrayList<>();
@@ -52,7 +62,7 @@ public class PanelHuesped extends JPanel {
         txtPerfPass.setText(titular.getContraseniaUsuario());
         txtPerfFoto.setText(titular.getFotoTitular());
 
-        actualizarVistaFoto(titular.getFotoTitular());
+        cargarImagenEnLabel(lblFotoPerfil, titular.getFotoTitular(), 140, 140, "Sin foto");
 
         reiniciarOcupantesConTitular();
         buscarDisponibles();
@@ -93,6 +103,7 @@ public class PanelHuesped extends JPanel {
     private JPanel crearTabReservar() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
 
+        // 1. Filtros de búsqueda
         JPanel filtro = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         filtro.setBorder(BorderFactory.createTitledBorder("Búsqueda de Apartamentos Disponibles"));
         txtBusqEntrada = new JTextField(LocalDate.now().plusDays(1).toString(), 10);
@@ -107,18 +118,28 @@ public class PanelHuesped extends JPanel {
         filtro.add(btnBuscar);
         panel.add(filtro, BorderLayout.NORTH);
 
+        // 2. Tabla central de apartamentos disponibles (ancho completo)
         String[] cols = {"Código", "Nombre", "Dormitorios", "Cap. Máx", "Características", "Tarifa Base/Pers"};
         modeloDisponibles = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
         tablaDisponibles = new JTable(modeloDisponibles);
+        tablaDisponibles.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tablaDisponibles.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                cargarGaleriaApartamentoSeleccionado();
+            }
+        });
         panel.add(new JScrollPane(tablaDisponibles), BorderLayout.CENTER);
 
-        JPanel inferior = new JPanel(new GridLayout(1, 2, 10, 10));
-        inferior.setPreferredSize(new Dimension(0, 260));
+        // 3. Zona inferior: Ocupantes (Izquierda) + Cotización (Centro) + Fotos del Apartamento (Derecha)
+        JPanel inferior = new JPanel(new BorderLayout(10, 10));
+        inferior.setPreferredSize(new Dimension(0, 290));
 
+        // 3A. Ocupantes
         JPanel panelOcupantes = new JPanel(new BorderLayout(5, 5));
-        panelOcupantes.setBorder(BorderFactory.createTitledBorder("Ocupantes de la Estancia (< 6 años no pagan, pero ocupan cupo)"));
+        panelOcupantes.setBorder(BorderFactory.createTitledBorder("Ocupantes (< 6 años gratis, ocupan cupo)"));
+        panelOcupantes.setPreferredSize(new Dimension(330, 0));
 
         JPanel formOcup = new JPanel(new GridLayout(3, 2, 5, 5));
         txtOcupNombre = new JTextField();
@@ -128,14 +149,15 @@ public class PanelHuesped extends JPanel {
         JButton btnResetOcup = new JButton("Reiniciar Lista");
         btnResetOcup.addActionListener(e -> reiniciarOcupantesConTitular());
 
-        formOcup.add(new JLabel("Nombre Ocupante:")); formOcup.add(txtOcupNombre);
-        formOcup.add(new JLabel("Fecha Nac. (YYYY-MM-DD):")); formOcup.add(txtOcupFechaNac);
+        formOcup.add(new JLabel("Nombre:")); formOcup.add(txtOcupNombre);
+        formOcup.add(new JLabel("Fecha Nac.:")); formOcup.add(txtOcupFechaNac);
         formOcup.add(btnAddOcup); formOcup.add(btnResetOcup);
 
         modeloListaOcupantes = new DefaultListModel<>();
         panelOcupantes.add(formOcup, BorderLayout.NORTH);
         panelOcupantes.add(new JScrollPane(new JList<>(modeloListaOcupantes)), BorderLayout.CENTER);
 
+        // 3B. Cotización noche por noche
         JPanel panelCotizar = new JPanel(new BorderLayout(5, 5));
         panelCotizar.setBorder(BorderFactory.createTitledBorder("Cotización Noche por Noche y Confirmación"));
         txtCotizacion = new JTextArea();
@@ -154,11 +176,87 @@ public class PanelHuesped extends JPanel {
         panelCotizar.add(new JScrollPane(txtCotizacion), BorderLayout.CENTER);
         panelCotizar.add(botonesAccion, BorderLayout.SOUTH);
 
-        inferior.add(panelOcupantes);
-        inferior.add(panelCotizar);
+        // 3C. Galería de fotos junto a la cotización
+        JPanel panelGaleria = new JPanel(new BorderLayout(5, 5));
+        panelGaleria.setBorder(BorderFactory.createTitledBorder("Fotos del Apartamento"));
+        panelGaleria.setPreferredSize(new Dimension(300, 0));
+
+        lblNombreAptoGaleria = new JLabel("Ningún apartamento seleccionado", SwingConstants.CENTER);
+        lblNombreAptoGaleria.setFont(new Font("SansSerif", Font.BOLD, 12));
+
+        lblFotoApto = new JLabel("Seleccione un apartamento", SwingConstants.CENTER);
+        lblFotoApto.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
+
+        lblContadorFotosApto = new JLabel("0 / 0", SwingConstants.CENTER);
+
+        JPanel controlesGaleria = new JPanel(new BorderLayout(5, 0));
+        btnFotoAnterior = new JButton("< Anterior");
+        btnFotoSiguiente = new JButton("Siguiente >");
+        btnFotoAnterior.setEnabled(false);
+        btnFotoSiguiente.setEnabled(false);
+
+        btnFotoAnterior.addActionListener(e -> cambiarFotoApartamento(-1));
+        btnFotoSiguiente.addActionListener(e -> cambiarFotoApartamento(1));
+
+        controlesGaleria.add(btnFotoAnterior, BorderLayout.WEST);
+        controlesGaleria.add(lblContadorFotosApto, BorderLayout.CENTER);
+        controlesGaleria.add(btnFotoSiguiente, BorderLayout.EAST);
+
+        panelGaleria.add(lblNombreAptoGaleria, BorderLayout.NORTH);
+        panelGaleria.add(lblFotoApto, BorderLayout.CENTER);
+        panelGaleria.add(controlesGaleria, BorderLayout.SOUTH);
+
+        inferior.add(panelOcupantes, BorderLayout.WEST);
+        inferior.add(panelCotizar, BorderLayout.CENTER);
+        inferior.add(panelGaleria, BorderLayout.EAST);
         panel.add(inferior, BorderLayout.SOUTH);
 
         return panel;
+    }
+
+    private void cargarGaleriaApartamentoSeleccionado() {
+        int fila = tablaDisponibles.getSelectedRow();
+        if (fila < 0 || fila >= apartamentosDisponiblesActuales.size()) {
+            fotosAptoSeleccionado.clear();
+            indiceFotoApto = 0;
+            lblNombreAptoGaleria.setText("Ningún apartamento seleccionado");
+            lblFotoApto.setIcon(null);
+            lblFotoApto.setText("Seleccione un apartamento");
+            lblContadorFotosApto.setText("0 / 0");
+            btnFotoAnterior.setEnabled(false);
+            btnFotoSiguiente.setEnabled(false);
+            return;
+        }
+
+        Apartamento apto = apartamentosDisponiblesActuales.get(fila);
+        lblNombreAptoGaleria.setText(apto.getNombreApartamento() + " (" + apto.getIdApartamento() + ")");
+        fotosAptoSeleccionado = apto.getListFotos();
+        indiceFotoApto = 0;
+        actualizarVisorFotoApartamento();
+    }
+
+    private void cambiarFotoApartamento(int desplazamiento) {
+        if (fotosAptoSeleccionado.isEmpty()) return;
+        indiceFotoApto = (indiceFotoApto + desplazamiento + fotosAptoSeleccionado.size()) % fotosAptoSeleccionado.size();
+        actualizarVisorFotoApartamento();
+    }
+
+    private void actualizarVisorFotoApartamento() {
+        if (fotosAptoSeleccionado.isEmpty()) {
+            lblFotoApto.setIcon(null);
+            lblFotoApto.setText("Sin fotos registradas");
+            lblContadorFotosApto.setText("0 / 0");
+            btnFotoAnterior.setEnabled(false);
+            btnFotoSiguiente.setEnabled(false);
+            return;
+        }
+
+        String ruta = fotosAptoSeleccionado.get(indiceFotoApto);
+        cargarImagenEnLabel(lblFotoApto, ruta, 265, 185, "Imagen no encontrada");
+        lblContadorFotosApto.setText("Foto " + (indiceFotoApto + 1) + " de " + fotosAptoSeleccionado.size());
+        boolean tieneVarias = fotosAptoSeleccionado.size() > 1;
+        btnFotoAnterior.setEnabled(tieneVarias);
+        btnFotoSiguiente.setEnabled(tieneVarias);
     }
 
     private JPanel crearTabMisReservas() {
@@ -204,7 +302,6 @@ public class PanelHuesped extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(15, 15));
         panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Contenedor visual de la foto de perfil
         lblFotoPerfil = new JLabel("Sin foto", SwingConstants.CENTER);
         lblFotoPerfil.setPreferredSize(new Dimension(170, 170));
         lblFotoPerfil.setBorder(BorderFactory.createTitledBorder("Foto de Perfil"));
@@ -212,7 +309,6 @@ public class PanelHuesped extends JPanel {
         JPanel panelFoto = new JPanel(new FlowLayout(FlowLayout.CENTER));
         panelFoto.add(lblFotoPerfil);
 
-        // Formulario de datos personales
         JPanel form = new JPanel(new GridLayout(5, 2, 10, 10));
         form.setBorder(BorderFactory.createTitledBorder("Actualizar Datos Personales"));
 
@@ -224,7 +320,7 @@ public class PanelHuesped extends JPanel {
         JPanel panelRutaFoto = new JPanel(new BorderLayout(5, 0));
         txtPerfFoto = new JTextField();
         JButton btnExaminarFoto = new JButton("Examinar...");
-        btnExaminarFoto.addActionListener(e -> seleccionarFoto());
+        btnExaminarFoto.addActionListener(e -> seleccionarFotoPerfil());
         panelRutaFoto.add(txtPerfFoto, BorderLayout.CENTER);
         panelRutaFoto.add(btnExaminarFoto, BorderLayout.EAST);
 
@@ -246,7 +342,7 @@ public class PanelHuesped extends JPanel {
             titularActual.setContraseniaUsuario(new String(txtPerfPass.getPassword()));
             titularActual.setFotoTitular(txtPerfFoto.getText().trim());
 
-            actualizarVistaFoto(titularActual.getFotoTitular());
+            cargarImagenEnLabel(lblFotoPerfil, titularActual.getFotoTitular(), 140, 140, "Sin foto");
             lblBienvenida.setText("Portal del Huésped — Bienvenido(a), " + titularActual.getNombreUsuario() + " (Doc: " + titularActual.getIdUsuario() + ")");
             JOptionPane.showMessageDialog(this, "Perfil actualizado correctamente.");
         });
@@ -256,7 +352,7 @@ public class PanelHuesped extends JPanel {
         return panel;
     }
 
-    private void seleccionarFoto() {
+    private void seleccionarFotoPerfil() {
         JFileChooser chooser = new JFileChooser();
         chooser.setDialogTitle("Seleccionar fotografía de perfil");
         chooser.setFileFilter(new FileNameExtensionFilter("Imágenes (JPG, PNG, GIF)", "jpg", "jpeg", "png", "gif"));
@@ -264,14 +360,14 @@ public class PanelHuesped extends JPanel {
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             String ruta = chooser.getSelectedFile().getAbsolutePath();
             txtPerfFoto.setText(ruta);
-            actualizarVistaFoto(ruta);
+            cargarImagenEnLabel(lblFotoPerfil, ruta, 140, 140, "Sin foto");
         }
     }
 
-    private void actualizarVistaFoto(String rutaFoto) {
+    private void cargarImagenEnLabel(JLabel label, String rutaFoto, int ancho, int alto, String mensajeVacio) {
         if (rutaFoto == null || rutaFoto.isBlank()) {
-            lblFotoPerfil.setIcon(null);
-            lblFotoPerfil.setText("Sin foto");
+            label.setIcon(null);
+            label.setText(mensajeVacio);
             return;
         }
 
@@ -288,12 +384,12 @@ public class PanelHuesped extends JPanel {
         }
 
         if (icono != null && icono.getIconWidth() > 0) {
-            Image imgEscalada = icono.getImage().getScaledInstance(140, 140, Image.SCALE_SMOOTH);
-            lblFotoPerfil.setIcon(new ImageIcon(imgEscalada));
-            lblFotoPerfil.setText("");
+            Image imgEscalada = icono.getImage().getScaledInstance(ancho, alto, Image.SCALE_SMOOTH);
+            label.setIcon(new ImageIcon(imgEscalada));
+            label.setText("");
         } else {
-            lblFotoPerfil.setIcon(null);
-            lblFotoPerfil.setText("Imagen no encontrada");
+            label.setIcon(null);
+            label.setText("Imagen no encontrada");
         }
     }
 
@@ -304,11 +400,20 @@ public class PanelHuesped extends JPanel {
             int personas = Integer.parseInt(txtBusqPersonas.getText().trim());
 
             modeloDisponibles.setRowCount(0);
+            apartamentosDisponiblesActuales.clear();
+
             for (Apartamento a : alojamiento.buscarApartamentosDisponibles(entrada, salida, personas)) {
+                apartamentosDisponiblesActuales.add(a);
                 modeloDisponibles.addRow(new Object[]{
                         a.getIdApartamento(), a.getNombreApartamento(), a.getNumeroDormitorios(),
                         a.getCapacidaMaxPersonas(), a.getCaracteristicas(), "$" + a.getTarifaPersona()
                 });
+            }
+
+            if (!apartamentosDisponiblesActuales.isEmpty()) {
+                tablaDisponibles.setRowSelectionInterval(0, 0);
+            } else {
+                cargarGaleriaApartamentoSeleccionado();
             }
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Revise las fechas (YYYY-MM-DD) y cantidad de personas.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -341,6 +446,7 @@ public class PanelHuesped extends JPanel {
             return;
         }
         try {
+            cargarGaleriaApartamentoSeleccionado();
             String codApto = (String) modeloDisponibles.getValueAt(fila, 0);
             LocalDate entrada = LocalDate.parse(txtBusqEntrada.getText().trim());
             LocalDate salida = LocalDate.parse(txtBusqSalida.getText().trim());

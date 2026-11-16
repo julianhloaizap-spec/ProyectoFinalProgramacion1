@@ -128,6 +128,18 @@ public class Alojamiento {
         return true;
     }
 
+    public boolean agregarFotoApartamento(String idApartamento, String rutaFoto) {
+        Apartamento apto = buscarApartamento(idApartamento);
+        if (apto == null || rutaFoto == null || rutaFoto.isBlank()) return false;
+        return apto.agregarFoto(rutaFoto);
+    }
+
+    public boolean eliminarFotoApartamento(String idApartamento, String rutaFoto) {
+        Apartamento apto = buscarApartamento(idApartamento);
+        if (apto == null || rutaFoto == null || rutaFoto.isBlank()) return false;
+        return apto.eliminarFoto(rutaFoto);
+    }
+
     public boolean registrarTemporada(Temporada temporada) {
         if (temporada != null && temporada.esValido()) {
             return listTemporadas.add(temporada);
