@@ -1,8 +1,11 @@
 package co.edu.uniquindio;
 
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.io.File;
+import java.net.URL;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -31,6 +34,7 @@ public class PanelHuesped extends JPanel {
 
     private JTextField txtPerfNombre, txtPerfCorreo, txtPerfTelefono, txtPerfFoto;
     private JPasswordField txtPerfPass;
+    private JLabel lblFotoPerfil;
 
     public PanelHuesped(Alojamiento alojamiento, VentanaPrincipal ventanaPrincipal) {
         this.alojamiento = alojamiento;
@@ -47,6 +51,8 @@ public class PanelHuesped extends JPanel {
         txtPerfTelefono.setText(titular.getTelefonoUsuario());
         txtPerfPass.setText(titular.getContraseniaUsuario());
         txtPerfFoto.setText(titular.getFotoTitular());
+
+        actualizarVistaFoto(titular.getFotoTitular());
 
         reiniciarOcupantesConTitular();
         buscarDisponibles();
@@ -195,21 +201,42 @@ public class PanelHuesped extends JPanel {
     }
 
     private JPanel crearTabPerfil() {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
-        JPanel form = new JPanel(new GridLayout(6, 2, 10, 10));
+        JPanel panel = new JPanel(new BorderLayout(15, 15));
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        // Contenedor visual de la foto de perfil
+        lblFotoPerfil = new JLabel("Sin foto", SwingConstants.CENTER);
+        lblFotoPerfil.setPreferredSize(new Dimension(170, 170));
+        lblFotoPerfil.setBorder(BorderFactory.createTitledBorder("Foto de Perfil"));
+
+        JPanel panelFoto = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        panelFoto.add(lblFotoPerfil);
+
+        // Formulario de datos personales
+        JPanel form = new JPanel(new GridLayout(5, 2, 10, 10));
         form.setBorder(BorderFactory.createTitledBorder("Actualizar Datos Personales"));
 
         txtPerfNombre = new JTextField();
         txtPerfCorreo = new JTextField();
         txtPerfTelefono = new JTextField();
         txtPerfPass = new JPasswordField();
+
+        JPanel panelRutaFoto = new JPanel(new BorderLayout(5, 0));
         txtPerfFoto = new JTextField();
+        JButton btnExaminarFoto = new JButton("Examinar...");
+        btnExaminarFoto.addActionListener(e -> seleccionarFoto());
+        panelRutaFoto.add(txtPerfFoto, BorderLayout.CENTER);
+        panelRutaFoto.add(btnExaminarFoto, BorderLayout.EAST);
 
         form.add(new JLabel("Nombre Completo:")); form.add(txtPerfNombre);
         form.add(new JLabel("Correo:")); form.add(txtPerfCorreo);
         form.add(new JLabel("Teléfono:")); form.add(txtPerfTelefono);
         form.add(new JLabel("Contraseña:")); form.add(txtPerfPass);
-        form.add(new JLabel("Ruta Fotografía:")); form.add(txtPerfFoto);
+        form.add(new JLabel("Fotografía:")); form.add(panelRutaFoto);
+
+        JPanel contenedorSuperior = new JPanel(new BorderLayout(15, 10));
+        contenedorSuperior.add(panelFoto, BorderLayout.WEST);
+        contenedorSuperior.add(form, BorderLayout.CENTER);
 
         JButton btnGuardarPerfil = new JButton("Guardar Cambios de Perfil");
         btnGuardarPerfil.addActionListener(e -> {
@@ -217,14 +244,57 @@ public class PanelHuesped extends JPanel {
             titularActual.setCorreoUsuario(txtPerfCorreo.getText());
             titularActual.setTelefonoUsuario(txtPerfTelefono.getText());
             titularActual.setContraseniaUsuario(new String(txtPerfPass.getPassword()));
-            titularActual.setFotoTitular(txtPerfFoto.getText());
-            lblBienvenida.setText("Portal del Huésped — Bienvenido(a), " + titularActual.getNombreUsuario());
+            titularActual.setFotoTitular(txtPerfFoto.getText().trim());
+
+            actualizarVistaFoto(titularActual.getFotoTitular());
+            lblBienvenida.setText("Portal del Huésped — Bienvenido(a), " + titularActual.getNombreUsuario() + " (Doc: " + titularActual.getIdUsuario() + ")");
             JOptionPane.showMessageDialog(this, "Perfil actualizado correctamente.");
         });
 
-        panel.add(form, BorderLayout.NORTH);
+        panel.add(contenedorSuperior, BorderLayout.NORTH);
         panel.add(btnGuardarPerfil, BorderLayout.SOUTH);
         return panel;
+    }
+
+    private void seleccionarFoto() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Seleccionar fotografía de perfil");
+        chooser.setFileFilter(new FileNameExtensionFilter("Imágenes (JPG, PNG, GIF)", "jpg", "jpeg", "png", "gif"));
+
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            String ruta = chooser.getSelectedFile().getAbsolutePath();
+            txtPerfFoto.setText(ruta);
+            actualizarVistaFoto(ruta);
+        }
+    }
+
+    private void actualizarVistaFoto(String rutaFoto) {
+        if (rutaFoto == null || rutaFoto.isBlank()) {
+            lblFotoPerfil.setIcon(null);
+            lblFotoPerfil.setText("Sin foto");
+            return;
+        }
+
+        ImageIcon icono = null;
+        File archivo = new File(rutaFoto);
+
+        if (archivo.exists()) {
+            icono = new ImageIcon(archivo.getAbsolutePath());
+        } else {
+            URL recurso = getClass().getResource("/" + rutaFoto.replaceFirst("^/", ""));
+            if (recurso != null) {
+                icono = new ImageIcon(recurso);
+            }
+        }
+
+        if (icono != null && icono.getIconWidth() > 0) {
+            Image imgEscalada = icono.getImage().getScaledInstance(140, 140, Image.SCALE_SMOOTH);
+            lblFotoPerfil.setIcon(new ImageIcon(imgEscalada));
+            lblFotoPerfil.setText("");
+        } else {
+            lblFotoPerfil.setIcon(null);
+            lblFotoPerfil.setText("Imagen no encontrada");
+        }
     }
 
     private void buscarDisponibles() {
