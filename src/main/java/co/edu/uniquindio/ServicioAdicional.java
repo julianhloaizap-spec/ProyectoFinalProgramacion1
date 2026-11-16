@@ -1,4 +1,4 @@
-package co.edu.uniquindio.proyectofinalprogramacion1;
+package co.edu.uniquindio;
 
 public class ServicioAdicional implements IFacturable {
     private static int contador = 0;

@@ -1,8 +1,9 @@
-package co.edu.uniquindio.proyectofinalprogramacion1;
+package co.edu.uniquindio;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.logging.Logger;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;

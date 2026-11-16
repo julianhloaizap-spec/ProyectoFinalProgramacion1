@@ -1,5 +1,6 @@
 package co.edu.uniquindio;
 
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -283,7 +284,7 @@ public class Alojamiento {
 
         if (r.cambiarEstado(EstadoReserva.FINALIZADA)) {
             Apartamento apto = r.getApartamento();
-            apto.cambiarEstadoOperativo(EstadoOperativo.PENDIENTE_PREPARACION, null);
+            apto.cambiarEstadoOperativo(EstadoOperativo.PENDIENTE_DE_PREPARACION, null);
             apto.setUltimaHoraSalida(momentoCheckOut);
             return true;
         }

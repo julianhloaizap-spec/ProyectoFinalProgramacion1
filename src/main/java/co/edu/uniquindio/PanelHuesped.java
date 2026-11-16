@@ -1,4 +1,4 @@
-package co.edu.uniquindio.proyectofinalprogramacion1;
+package co.edu.uniquindio;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;

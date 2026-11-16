@@ -1,4 +1,4 @@
-package co.edu.uniquindio.proyectofinalprogramacion1;
+package co.edu.uniquindio;
 
 public enum EstadoTemporada {
     BAJA(100),

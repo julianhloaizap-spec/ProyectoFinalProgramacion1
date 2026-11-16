@@ -122,7 +122,7 @@ class AlojamientoTest {
 
         LocalDateTime horaSalida = salida1.atTime(13, 0);
         Assertions.assertTrue(alojamiento.realizarCheckOut(r1.getIdReserva(), horaSalida));
-        Assertions.assertEquals(EstadoOperativo.PENDIENTE_PREPARACION, apartamento.getEstadoOperativo());
+        Assertions.assertEquals(EstadoOperativo.PENDIENTE_DE_PREPARACION, apartamento.getEstadoOperativo());
 
         Reserva r2 = alojamiento.crearReserva(titular.getIdUsuario(), apartamento.getIdApartamento(),
                 ocupantes, salida1, salida1.plusDays(2), Canal.DIRECTA, "");
