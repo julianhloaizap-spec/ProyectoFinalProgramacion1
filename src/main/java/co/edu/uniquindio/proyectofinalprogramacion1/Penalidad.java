@@ -1,34 +1,30 @@
 package co.edu.uniquindio.proyectofinalprogramacion1;
 
-public class Penalidad {
-    //atributos
-    private String idPenalidad;
-    private String descripcionPenalidad;
-    private int tarifaPenalidad;
-    //Constructor
-    public Penalidad(String idPenalidad, String descripcionPenalidad, int tarifaPenalidad) {
-        this.idPenalidad = idPenalidad;
+public class Penalidad implements IFacturable {
+    private static int contador = 0;
+    // atributos
+    private final String idPenalidad;
+    private final String descripcionPenalidad;
+    private final int tarifaPenalidad;
+    //constructor
+    public Penalidad(String descripcionPenalidad, int tarifaPenalidad) {
+        this.idPenalidad = String.format("PEN-%03d", ++contador);
         this.descripcionPenalidad = descripcionPenalidad;
         this.tarifaPenalidad = tarifaPenalidad;
     }
-    //getters and setters
+
+    @Override
+    public Cargo generarCargo() {
+        return new Cargo("Penalidad: " + descripcionPenalidad, tarifaPenalidad);
+    }
+    // gets
     public String getIdPenalidad() {
         return idPenalidad;
-    }
-    public void setIdPenalidad(String idPenalidad) {
-        this.idPenalidad = idPenalidad;
     }
     public String getDescripcionPenalidad() {
         return descripcionPenalidad;
     }
-    public void setDescripcionPenalidad(String descripcionPenalidad) {
-        this.descripcionPenalidad = descripcionPenalidad;
-    }
     public int getTarifaPenalidad() {
         return tarifaPenalidad;
     }
-    public void setTarifaPenalidad(int tarifaPenalidad) {
-        this.tarifaPenalidad = tarifaPenalidad;
-    }
-
 }
