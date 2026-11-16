@@ -82,7 +82,7 @@ public class PanelRecepcionista extends JPanel {
         JButton btnNoShow = new JButton("Declarar No-Show (>10:00 p. m.)");
         btnNoShow.addActionListener(e -> ejecutarAccionEstado("NOSHOW"));
         JButton btnCancelar = new JButton("Cancelar Reserva");
-        btnCancelar.addActionListener(e -> ejecutarAccionEstado("CANCELAR"));
+        btnCancelar.addActionListener(e -> cancelarReservaRecepcion());
 
         barraAcciones.add(btnConfirmar);
         barraAcciones.add(btnCheckIn);
@@ -91,7 +91,7 @@ public class PanelRecepcionista extends JPanel {
         barraAcciones.add(btnCancelar);
 
         JPanel form = new JPanel(new GridLayout(5, 4, 6, 6));
-        form.setBorder(BorderFactory.createTitledBorder("Registrar Reserva Presencial / Telefónica / Externa (ID Automático)"));
+        form.setBorder(BorderFactory.createTitledBorder("Cotizar y Registrar Reserva Presencial / Telefónica / Externa (ID Automático)"));
 
         txtDocTitular = new JTextField("1094123456");
         txtCodApto = new JTextField("APT-001");
@@ -105,9 +105,12 @@ public class PanelRecepcionista extends JPanel {
         JButton btnNuevoTitular = new JButton("+ Registrar Titular Rápido");
         btnNuevoTitular.addActionListener(e -> dialogoRegistroRapidoTitular());
 
+        JButton btnCotizar = new JButton("Cotizar Estancia");
+        btnCotizar.addActionListener(e -> cotizarEstanciaRecepcion());
+
         JButton btnCrear = new JButton("Crear Reserva");
         btnCrear.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btnCrear.addActionListener(e -> crearReservaRecepcion());
+        btnCrear.addActionListener(e -> crearReservaRecepcion(true));
 
         form.add(new JLabel("Doc. Titular:")); form.add(txtDocTitular);
         form.add(new JLabel("Código Apto:")); form.add(txtCodApto);
@@ -117,7 +120,8 @@ public class PanelRecepcionista extends JPanel {
         form.add(new JLabel("Salida (YYYY-MM-DD):")); form.add(txtSalida);
         form.add(new JLabel("Adultos (>=6 años):")); form.add(txtCantAdultos);
         form.add(new JLabel("Menores (<6 años):")); form.add(txtCantMenores);
-        form.add(btnNuevoTitular); form.add(btnCrear);
+        form.add(btnNuevoTitular); form.add(btnCotizar);
+        form.add(btnCrear); form.add(new JLabel(""));
 
         JPanel sur = new JPanel(new BorderLayout(5, 5));
         sur.add(barraAcciones, BorderLayout.NORTH);
@@ -134,10 +138,10 @@ public class PanelRecepcionista extends JPanel {
         sup.setBorder(BorderFactory.createTitledBorder("Gestión de Folio (Cargos Adicionales y Pagos)"));
 
         txtFolioIdReserva = new JTextField("RES-001");
-        txtServicioNombre = new JTextField("Desayuno Típico");
-        txtServicioCantidad = new JTextField("1");
-        txtServicioValor = new JTextField("25000");
-        txtPagoMonto = new JTextField("100000");
+        txtServicioNombre = new JTextField();
+        txtServicioCantidad = new JTextField();
+        txtServicioValor = new JTextField();
+        txtPagoMonto = new JTextField();
         cbMedioPago = new JComboBox<>(MedioPago.values());
 
         JButton btnVerFolio = new JButton("Consultar Folio");
@@ -242,7 +246,89 @@ public class PanelRecepcionista extends JPanel {
         }
     }
 
-    private void crearReservaRecepcion() {
+    private ArrayList<Ocupante> construirListaOcupantesRecepcion(int adultos, int menores) {
+        ArrayList<Ocupante> ocupantes = new ArrayList<>();
+        for (int i = 1; i <= adultos; i++) {
+            ocupantes.add(new Ocupante("Adulto " + i, LocalDate.of(1990, 1, 1)));
+        }
+        for (int i = 1; i <= menores; i++) {
+            ocupantes.add(new Ocupante("Menor " + i, LocalDate.now().minusYears(3)));
+        }
+        return ocupantes;
+    }
+
+    private String construirTextoCotizacionRecepcion(Apartamento apto, LocalDate entrada, LocalDate salida,
+                                                     ArrayList<Ocupante> ocupantes, Canal canal, boolean disponible) {
+        String desglose = alojamiento.cotizarEstancia(apto.getIdApartamento(), entrada, salida, ocupantes);
+        desglose += "Canal de reserva: " + canal + "\n";
+        if (canal == Canal.EXTERNA) {
+            int total = new Folio("TMP").calcularPrecioAlojamiento(apto, alojamiento.getListTemporadas(), entrada, salida, ocupantes);
+            int comision = (int) Math.round(total * 0.15);
+            desglose += String.format("Comisión plataforma externa (15%%): $%d COP\n", comision);
+        }
+        desglose += "Disponibilidad en esas fechas: " + (disponible ? "DISPONIBLE" : "NO DISPONIBLE (ocupado o bloqueado)") + "\n";
+        return desglose;
+    }
+
+    private void cotizarEstanciaRecepcion() {
+        try {
+            String codApto = txtCodApto.getText().trim();
+            Apartamento apto = alojamiento.buscarApartamento(codApto);
+            if (apto == null) {
+                JOptionPane.showMessageDialog(this, "Apartamento no encontrado o inactivo.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            LocalDate entrada = LocalDate.parse(txtEntrada.getText().trim());
+            LocalDate salida = LocalDate.parse(txtSalida.getText().trim());
+            if (entrada.isBefore(LocalDate.now()) || !salida.isAfter(entrada)) {
+                JOptionPane.showMessageDialog(this, "Las fechas son inválidas (la entrada no puede ser pasada y la salida debe ser posterior).", "Fechas Inválidas", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            int adultos = Integer.parseInt(txtCantAdultos.getText().trim());
+            int menores = Integer.parseInt(txtCantMenores.getText().trim());
+            if (adultos < 0 || menores < 0 || (adultos + menores) == 0) {
+                JOptionPane.showMessageDialog(this, "Debe indicar al menos un ocupante válido.", "Ocupantes Inválidos", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            if ((adultos + menores) > apto.getCapacidaMaxPersonas()) {
+                JOptionPane.showMessageDialog(this, "La cantidad de ocupantes (" + (adultos + menores)
+                        + ") excede la capacidad máxima del apartamento (" + apto.getCapacidaMaxPersonas() + ").", "Capacidad Excedida", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            Canal canal = (Canal) cbCanal.getSelectedItem();
+            ArrayList<Ocupante> ocupantes = construirListaOcupantesRecepcion(adultos, menores);
+            boolean disponible = alojamiento.validarDisponibilidad(codApto, entrada, salida);
+            String textoCotizacion = construirTextoCotizacionRecepcion(apto, entrada, salida, ocupantes, canal, disponible)
+                    + "\n¿El huésped acepta la cotización para crear la reserva?";
+
+            JTextArea area = new JTextArea(textoCotizacion, 14, 58);
+            area.setEditable(false);
+            area.setFont(new Font("Monospaced", Font.PLAIN, 12));
+
+            if (disponible) {
+                Object[] opciones = {"Confirmar y Crear Reserva", "No Acepta / Cerrar"};
+                int eleccion = JOptionPane.showOptionDialog(this, new JScrollPane(area),
+                        "Cotización de Estancia — " + apto.getNombreApartamento(),
+                        JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE, null, opciones, opciones[0]);
+
+                if (eleccion == JOptionPane.YES_OPTION) {
+                    crearReservaRecepcion(false);
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, new JScrollPane(area),
+                        "Cotización — Apartamento No Disponible", JOptionPane.WARNING_MESSAGE);
+            }
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Cantidad de adultos o menores inválida.", "Error", JOptionPane.ERROR_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Revise el formato de fechas (YYYY-MM-DD): " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void crearReservaRecepcion(boolean solicitarConfirmacion) {
         try {
             String docTit = txtDocTitular.getText().trim();
             String codApto = txtCodApto.getText().trim();
@@ -253,12 +339,32 @@ public class PanelRecepcionista extends JPanel {
             int adultos = Integer.parseInt(txtCantAdultos.getText().trim());
             int menores = Integer.parseInt(txtCantMenores.getText().trim());
 
-            ArrayList<Ocupante> ocupantes = new ArrayList<>();
-            for (int i = 1; i <= adultos; i++) {
-                ocupantes.add(new Ocupante("Adulto " + i, LocalDate.of(1990, 1, 1)));
+            if (adultos < 0 || menores < 0 || (adultos + menores) == 0) {
+                JOptionPane.showMessageDialog(this, "Debe registrar al menos un ocupante válido.", "Error", JOptionPane.WARNING_MESSAGE);
+                return;
             }
-            for (int i = 1; i <= menores; i++) {
-                ocupantes.add(new Ocupante("Menor " + i, LocalDate.now().minusYears(3)));
+
+            ArrayList<Ocupante> ocupantes = construirListaOcupantesRecepcion(adultos, menores);
+
+            if (solicitarConfirmacion) {
+                Apartamento apto = alojamiento.buscarApartamento(codApto);
+                if (apto == null) {
+                    JOptionPane.showMessageDialog(this, "Apartamento no encontrado o inactivo.", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                boolean disponible = alojamiento.validarDisponibilidad(codApto, entrada, salida);
+                String textoConfirmacion = construirTextoCotizacionRecepcion(apto, entrada, salida, ocupantes, canal, disponible)
+                        + "\n¿El huésped acepta esta cotización para confirmar la reserva?";
+
+                JTextArea area = new JTextArea(textoConfirmacion, 14, 58);
+                area.setEditable(false);
+                area.setFont(new Font("Monospaced", Font.PLAIN, 12));
+
+                int resp = JOptionPane.showConfirmDialog(this, new JScrollPane(area),
+                        "Confirmar Cotización antes de Reservar", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+                if (resp != JOptionPane.YES_OPTION) {
+                    return;
+                }
             }
 
             Reserva r = alojamiento.crearReserva(docTit, codApto, ocupantes, entrada, salida, canal, codExt);
@@ -285,7 +391,6 @@ public class PanelRecepcionista extends JPanel {
             case "CHECKIN" -> alojamiento.realizarCheckIn(idReserva);
             case "CHECKOUT" -> alojamiento.realizarCheckOut(idReserva);
             case "NOSHOW" -> alojamiento.declararNoShow(idReserva);
-            case "CANCELAR" -> alojamiento.cancelarReserva(idReserva, LocalDate.now());
             default -> false;
         };
 
@@ -294,6 +399,52 @@ public class PanelRecepcionista extends JPanel {
             refrescarTodo();
         } else {
             JOptionPane.showMessageDialog(this, "No se cumplen las condiciones de horario/estado para ejecutar: " + accion, "Operación Rechazada", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void cancelarReservaRecepcion() {
+        int fila = tablaReservas.getSelectedRow();
+        if (fila < 0) {
+            JOptionPane.showMessageDialog(this, "Seleccione una reserva de la tabla.", "Atención", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        String idReserva = (String) modeloReservas.getValueAt(fila, 0);
+        Reserva r = alojamiento.buscarReserva(idReserva);
+        if (r == null) return;
+
+        if (r.getEstadoReserva() != EstadoReserva.PENDIENTE && r.getEstadoReserva() != EstadoReserva.CONFIRMADA) {
+            JOptionPane.showMessageDialog(this,
+                    "Solo se pueden cancelar reservas en estado PENDIENTE o CONFIRMADA.\nEstado actual: " + r.getEstadoReserva(),
+                    "Operación no permitida", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int totalPagado = r.getFolio().calcularTotalPagos();
+        int devolucion = r.previsualizarDevolucionCancelacion(LocalDate.now());
+        int retenido = Math.max(0, totalPagado - devolucion);
+
+        String mensaje = "Reserva: " + r.getIdReserva() + " (Estado: " + r.getEstadoReserva() + ")\n"
+                + "Titular: " + r.getInfoTitular().getNombreUsuario() + "\n"
+                + "Total abonado a la fecha: $" + totalPagado + " COP\n"
+                + "Retención por política: $" + retenido + " COP\n"
+                + "Cantidad a devolver al cliente: $" + devolucion + " COP\n\n"
+                + "¿Desea confirmar la cancelación de esta reserva?";
+
+        int confirm = JOptionPane.showConfirmDialog(this, mensaje,
+                "Confirmar Cancelación", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+
+        if (confirm == JOptionPane.YES_OPTION) {
+            if (alojamiento.cancelarReserva(idReserva, LocalDate.now())) {
+                JOptionPane.showMessageDialog(this,
+                        "Reserva cancelada exitosamente.\nDevolución registrada: $" + devolucion + " COP.");
+                refrescarTodo();
+                if (txtFolioIdReserva.getText().trim().equalsIgnoreCase(idReserva)) {
+                    consultarFolio();
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "No se pudo cancelar la reserva.", "Error", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
 
@@ -339,7 +490,9 @@ public class PanelRecepcionista extends JPanel {
 
             if (alojamiento.registrarCargoFacturable(idRes, srv)) {
                 JOptionPane.showMessageDialog(this, "Cargo cargado al folio (" + cantidad + " x $" + valorUnitario + " COP).");
-                txtServicioCantidad.setText("1");
+                txtServicioNombre.setText("");
+                txtServicioCantidad.setText("");
+                txtServicioValor.setText("");
                 consultarFolio();
                 refrescarTodo();
             } else {
@@ -383,6 +536,7 @@ public class PanelRecepcionista extends JPanel {
             MedioPago medio = (MedioPago) cbMedioPago.getSelectedItem();
             if (alojamiento.registrarPagoReserva(idRes, medio, monto)) {
                 JOptionPane.showMessageDialog(this, "Pago registrado exitosamente.");
+                txtPagoMonto.setText("");
                 consultarFolio();
                 refrescarTodo();
             } else {

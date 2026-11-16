@@ -90,7 +90,16 @@ public class Reserva {
     }
 
     public int previsualizarDevolucionCancelacion(LocalDate fechaCancelacion) {
+        if (estadoReserva != EstadoReserva.PENDIENTE && estadoReserva != EstadoReserva.CONFIRMADA) {
+            return 0;
+        }
+        if (fechaCancelacion == null || politicaCongelada == null) {
+            return 0;
+        }
         int totalPagado = folio.calcularTotalPagos();
+        if (totalPagado <= 0) {
+            return 0;
+        }
         return politicaCongelada.calcularDevolucion(valorTotalCongelado, totalPagado, fechaCancelacion, fechaEntrada);
     }
 

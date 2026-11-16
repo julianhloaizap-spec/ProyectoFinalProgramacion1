@@ -28,6 +28,10 @@ public class PoliticaCancelacion {
 
     public int calcularDevolucion(int valorEstanciaCongelado, int totalPagado,
                                   LocalDate fechaCancelacion, LocalDate fechaEntrada) {
+        if (fechaCancelacion == null || fechaEntrada == null || totalPagado <= 0) {
+            return 0;
+        }
+
         long diasAnticipacion = ChronoUnit.DAYS.between(fechaCancelacion, fechaEntrada);
 
         int retencion;

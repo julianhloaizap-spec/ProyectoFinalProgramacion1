@@ -268,7 +268,7 @@ public class PanelHuesped extends JPanel {
         JPanel controles = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         controles.setBorder(BorderFactory.createTitledBorder("Pagos / Anticipo (30%) y Cancelación"));
 
-        txtMontoAbono = new JTextField("100000", 10);
+        txtMontoAbono = new JTextField(10);
         cbMedioPago = new JComboBox<>(MedioPago.values());
         JButton btnPagar = new JButton("Registrar Abono");
         btnPagar.addActionListener(e -> abonarReservaSeleccionada());
@@ -553,6 +553,7 @@ public class PanelHuesped extends JPanel {
 
             if (alojamiento.registrarPagoReserva(idReserva, medio, monto)) {
                 JOptionPane.showMessageDialog(this, "Pago registrado exitosamente.");
+                txtMontoAbono.setText("");
                 actualizarTablaMisReservas();
                 mostrarDetalleFolioSeleccionado();
             } else {
@@ -573,15 +574,31 @@ public class PanelHuesped extends JPanel {
         Reserva r = alojamiento.buscarReserva(idReserva);
         if (r == null) return;
 
+        if (r.getEstadoReserva() != EstadoReserva.PENDIENTE && r.getEstadoReserva() != EstadoReserva.CONFIRMADA) {
+            JOptionPane.showMessageDialog(this,
+                    "Solo puede cancelar reservas en estado PENDIENTE o CONFIRMADA.\nEstado actual: " + r.getEstadoReserva(),
+                    "Cancelación no disponible", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        int totalPagado = r.getFolio().calcularTotalPagos();
         int devolucion = r.previsualizarDevolucionCancelacion(LocalDate.now());
-        int confirm = JOptionPane.showConfirmDialog(this,
-                "Según la política vigente, si cancela hoy se le devolverán: $" + devolucion + " COP.\n¿Desea confirmar la cancelación?",
-                "Confirmar Cancelación", JOptionPane.YES_NO_OPTION);
+        int retenido = Math.max(0, totalPagado - devolucion);
+
+        String mensaje = "Reserva: " + r.getIdReserva() + " (Estado: " + r.getEstadoReserva() + ")\n"
+                + "Total pagado a la fecha: $" + totalPagado + " COP\n"
+                + "Retención según política vigente: $" + retenido + " COP\n"
+                + "Cantidad a devolver si cancela hoy: $" + devolucion + " COP\n\n"
+                + "¿Desea confirmar la cancelación?";
+
+        int confirm = JOptionPane.showConfirmDialog(this, mensaje,
+                "Confirmar Cancelación", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
 
         if (confirm == JOptionPane.YES_OPTION) {
             if (alojamiento.cancelarReserva(idReserva, LocalDate.now())) {
                 JOptionPane.showMessageDialog(this, "Reserva cancelada. Devolución registrada: $" + devolucion + " COP.");
                 actualizarTablaMisReservas();
+                mostrarDetalleFolioSeleccionado();
                 buscarDisponibles();
             } else {
                 JOptionPane.showMessageDialog(this, "Esta reserva no puede cancelarse en su estado actual.", "Error", JOptionPane.ERROR_MESSAGE);
