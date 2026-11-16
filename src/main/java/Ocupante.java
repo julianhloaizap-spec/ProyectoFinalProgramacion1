@@ -1,40 +1,31 @@
+package co.edu.uniquindio;
+
 import java.time.LocalDate;
+import java.time.Period;
 
 public class Ocupante {
-    private String nombreOcupante;
-    private LocalDate fechaNacOcupante;
+    private final String nombreOcupante;
+    private final LocalDate fechaNacOcupante;
 
     public Ocupante(String nombreOcupante, LocalDate fechaNacOcupante) {
-        this.nombreOcupante = nombreOcupante;
+        this.nombreOcupante = nombreOcupante != null ? nombreOcupante.trim() : "";
         this.fechaNacOcupante = fechaNacOcupante;
     }
 
     public boolean esValido() {
-        return nombreOcupante != null && !nombreOcupante.isBlank()
-                && fechaNacOcupante != null;
+        return !nombreOcupante.isBlank() && fechaNacOcupante != null
+                && !fechaNacOcupante.isAfter(LocalDate.now());
     }
 
-    public String getNombreOcupante() {
-        return nombreOcupante;
+    public int calcularEdad(LocalDate fechaReferencia) {
+        if (fechaNacOcupante == null || fechaReferencia == null) return 0;
+        return Period.between(fechaNacOcupante, fechaReferencia).getYears();
     }
 
-    public boolean setNombreOcupante(String nombreOcupante) {
-        boolean nombreLimpio = nombreOcupante != null && !nombreOcupante.isBlank();
-        if (nombreLimpio) {
-            this.nombreOcupante = nombreOcupante.trim();
-        }
-        return nombreLimpio;
+    public boolean pagaTarifa(LocalDate fechaEntrada) {
+        return calcularEdad(fechaEntrada) >= 6;
     }
 
-    public LocalDate getFechaNacOcupante() {
-        return fechaNacOcupante;
-    }
-
-    public boolean setFechaNacOcupante(LocalDate fechaNacOcupante) {
-        boolean validado = fechaNacOcupante != null && fechaNacOcupante.isBefore(LocalDate.now());
-        if (validado) {
-            this.fechaNacOcupante = fechaNacOcupante;
-        }
-        return validado;
-    }
+    public String getNombreOcupante() { return nombreOcupante; }
+    public LocalDate getFechaNacOcupante() { return fechaNacOcupante; }
 }

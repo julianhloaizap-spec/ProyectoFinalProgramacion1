@@ -1,80 +1,64 @@
+package co.edu.uniquindio;
+
+import java.util.Objects;
+
 public abstract class Usuario {
     protected String nombreUsuario;
-    protected final String idUsuario;
+    protected String idUsuario;
     protected String correoUsuario;
     protected String telefonoUsuario;
     protected String contraseniaUsuario;
+    protected boolean activo;
 
     public Usuario(String nombreUsuario, String idUsuario, String correoUsuario,
                    String telefonoUsuario, String contraseniaUsuario) {
-        if (idUsuario == null) {
-            this.idUsuario = "";
-        } else {
-            this.idUsuario = idUsuario.trim();
-        }
-
-        this.nombreUsuario = nombreUsuario;
-        this.correoUsuario = correoUsuario;
-        this.telefonoUsuario = telefonoUsuario;
-        this.contraseniaUsuario = contraseniaUsuario;
+        this.nombreUsuario = nombreUsuario != null ? nombreUsuario.trim() : "";
+        this.idUsuario = idUsuario != null ? idUsuario.trim() : "";
+        this.correoUsuario = correoUsuario != null ? correoUsuario.trim() : "";
+        this.telefonoUsuario = telefonoUsuario != null ? telefonoUsuario.trim() : "";
+        this.contraseniaUsuario = contraseniaUsuario != null ? contraseniaUsuario.trim() : "";
+        this.activo = true;
     }
 
-    // Se validan los datos del constructor antes de registrar el usuario
+    public abstract String getRol();
 
     public boolean esValido() {
-        return nombreUsuario != null && !nombreUsuario.isBlank()
-                && idUsuario != null && !idUsuario.isBlank()
-                && correoUsuario != null && !correoUsuario.isBlank()
-                && telefonoUsuario != null && !telefonoUsuario.isBlank()
-                && contraseniaUsuario != null && !contraseniaUsuario.isBlank();
+        return !nombreUsuario.isBlank() && !idUsuario.isBlank()
+                && !correoUsuario.isBlank() && !contraseniaUsuario.isBlank();
     }
 
-    public String getNombreUsuario() {
-        return nombreUsuario;
+    public boolean validarCredenciales(String id, String contrasenia) {
+        return activo && id != null && contrasenia != null
+                && this.idUsuario.equals(id.trim())
+                && this.contraseniaUsuario.equals(contrasenia);
     }
 
-    public boolean setNombreUsuario(String nombreUsuario) {
-        boolean validado = nombreUsuario != null && !nombreUsuario.isBlank();
-        if (validado) {
-            this.nombreUsuario = nombreUsuario.trim();
-        }
-        return validado;
+    public String getNombreUsuario() { return nombreUsuario; }
+    public void setNombreUsuario(String nombreUsuario) { this.nombreUsuario = nombreUsuario != null ? nombreUsuario.trim() : ""; }
+
+    public String getIdUsuario() { return idUsuario; }
+    public String getCorreoUsuario() { return correoUsuario; }
+    public void setCorreoUsuario(String correoUsuario) { this.correoUsuario = correoUsuario != null ? correoUsuario.trim() : ""; }
+
+    public String getTelefonoUsuario() { return telefonoUsuario; }
+    public void setTelefonoUsuario(String telefonoUsuario) { this.telefonoUsuario = telefonoUsuario != null ? telefonoUsuario.trim() : ""; }
+
+    public String getContraseniaUsuario() { return contraseniaUsuario; }
+    public void setContraseniaUsuario(String contraseniaUsuario) { this.contraseniaUsuario = contraseniaUsuario != null ? contraseniaUsuario.trim() : ""; }
+
+    public boolean isActivo() { return activo; }
+    public void setActivo(boolean activo) { this.activo = activo; }
+
+    @Override
+    public boolean equals(Object object) {
+        if (this == object) return true;
+        if (!(object instanceof Usuario usuario)) return false;
+        return Objects.equals(idUsuario, usuario.idUsuario);
     }
 
-    public String getIdUsuario() {
-        return idUsuario;
-    }
-
-    public String getCorreoUsuario() {
-        return correoUsuario;
-    }
-
-    public boolean setCorreoUsuario(String correoUsuario) {
-        boolean validado = correoUsuario != null && !correoUsuario.isBlank();
-        if (validado) {
-            this.correoUsuario = correoUsuario.trim();
-        }
-        return validado;
-    }
-
-    public boolean setContraseniaUsuario(String contraseniaUsuario) {
-        boolean contraseniaNueva = contraseniaUsuario != null && !contraseniaUsuario.isBlank();
-        if (contraseniaNueva) {
-            this.contraseniaUsuario = contraseniaUsuario.trim();
-        }
-        return contraseniaNueva;
-    }
-
-    public String getTelefonoUsuario() {
-        return telefonoUsuario;
-    }
-
-    public boolean setTelefonoUsuario(String telefonoUsuario) {
-        boolean validado = telefonoUsuario != null && !telefonoUsuario.isBlank();
-        if (validado) {
-            this.telefonoUsuario = telefonoUsuario.trim();
-        }
-        return validado;
+    @Override
+    public int hashCode() {
+        return Objects.hash(idUsuario);
     }
 }
 

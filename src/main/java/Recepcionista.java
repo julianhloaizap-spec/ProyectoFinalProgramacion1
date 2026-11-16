@@ -1,28 +1,33 @@
+package co.edu.uniquindio;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 
 public class Recepcionista extends Usuario implements IReservable {
+    private final ArrayList<Reserva> listReservasGestionadas;
 
-    private ArrayList<Reserva> listReservas;
-
-    public Recepcionista(String nombreUsuario, String idUsuario, String correoUsuario, String telefonoUsuario, String contraseniaUsuario, ArrayList<Reserva> listReservas) {
+    public Recepcionista(String nombreUsuario, String idUsuario, String correoUsuario,
+                         String telefonoUsuario, String contraseniaUsuario) {
         super(nombreUsuario, idUsuario, correoUsuario, telefonoUsuario, contraseniaUsuario);
-        this.listReservas = new ArrayList<>();
-    }
-
-    public ArrayList<Reserva> getListReservas() {
-        this.listReservas = new ArrayList<>();
+        this.listReservasGestionadas = new ArrayList<>();
     }
 
     @Override
-    public boolean esValido() {
-        return super.esValido();
+    public String getRol() {
+        return "RECEPCIONISTA";
     }
 
     @Override
-    public Reserva registrarReserva(String idReserva, LocalDate fechaReserva, Titular infoTitular,
-                                    EstadoReserva estadoReserva, LocalDate fechaEntrada, LocalDate fechaSalida) {
+    public Reserva registrarReserva(Apartamento apartamento, Titular infoTitular,
+                                    ArrayList<Ocupante> ocupantes, LocalDate fechaEntrada,
+                                    LocalDate fechaSalida, Canal canal, String codigoExterno) {
+        Reserva r = new Reserva(infoTitular, apartamento, ocupantes, fechaEntrada, fechaSalida, canal, codigoExterno);
+        listReservasGestionadas.add(r);
+        infoTitular.asociarReserva(r);
+        return r;
+    }
 
-        return null;
+    public ArrayList<Reserva> getListReservasGestionadas() {
+        return new ArrayList<>(listReservasGestionadas);
     }
 }

@@ -1,6 +1,10 @@
+package co.edu.uniquindio;
+
 import java.time.LocalDate;
+import java.util.ArrayList;
 
 public interface IReservable {
-    public Reserva registrarReserva(String idReserva, LocalDate fechaReserva, Titular infoTitular,
-                                    EstadoReserva estadoReserva, LocalDate fechaEntrada, LocalDate fechaSalida);
+    Reserva registrarReserva(Apartamento apartamento, Titular infoTitular,
+                             ArrayList<Ocupante> ocupantes, LocalDate fechaEntrada,
+                             LocalDate fechaSalida, Canal canal, String codigoExterno);
 }
