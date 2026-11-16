@@ -1,85 +1,140 @@
 package co.edu.uniquindio.proyectofinalprogramacion1;
 
-
 import java.time.LocalDate;
 import java.util.ArrayList;
 
 public class Folio {
     //atributos
-    private String idFolio;
-    private ArrayList <ServicioAdicional> listServiciosAdicionales;
-    private ArrayList <Penalidad> listPenalidades;
-    private ArrayList <Temporada> listTemporada;
-    private ArrayList <Pago> listPagos;
+    private final String idFolio;
+    private final ArrayList<Cargo> listCargos;
+    private final ArrayList<Pago> listPagos;
 
-    //Constructor
+    //constructor
     public Folio(String idFolio) {
-        if (idFolio == null){
-            this.idFolio = "";
-        } else {
-            this.idFolio = idFolio.trim();
-        }
-        this.listServiciosAdicionales = new ArrayList<>();
-        this.listPenalidades = new ArrayList<>();
-        this.listTemporada = new ArrayList<>();
+        this.idFolio = idFolio != null ? idFolio.trim() : "";
+        this.listCargos = new ArrayList<>();
         this.listPagos = new ArrayList<>();
-
-    }
-    // Los datos del constructor se revisan antes de realizar el folio.
-    public boolean esValido() {
-        return idFolio != null && !idFolio.isBlank();
     }
 
-    //getters and setters
-    public String getIdFolio() {
-        return idFolio;
-    }
-    public void setIdFolio(String idFolio) {
-        this.idFolio = idFolio;
-    }
-    public ArrayList<ServicioAdicional> getListServiciosAdicionales() {
-        return listServiciosAdicionales;
-    }
-    public ArrayList<Penalidad> getListPenalidades() {
-        return listPenalidades;
-    }
-    public ArrayList<Temporada> getListTemporada() {
-        return listTemporada;
-    }
-    public ArrayList<Pago> getListPagos() {
-        return listPagos;
+    public static EstadoTemporada determinarTemporadaFecha(LocalDate fecha, ArrayList<Temporada> temporadas) {
+        if (temporadas != null) {
+            for (Temporada t : temporadas) {
+                if (t != null && t.esValido() && t.incluyeFecha(fecha)) {
+                    return t.getEstadoTemporada();
+                }
+            }
+        }
+        return EstadoTemporada.BAJA;
     }
 
-    //metodos
-    public int calcularPrecioAlojamiento (Apartamento apartamento, LocalDate fechaEntrada, LocalDate fechaSalida,ArrayList<Ocupante> listOcupantes, Administrador administrador) {
-        int precioAlojamiento;
-        return 0;
+    public static String generarDesgloseCotizacion(Apartamento apartamento, ArrayList<Temporada> temporadas,
+                                                   LocalDate fechaEntrada, LocalDate fechaSalida,
+                                                   ArrayList<Ocupante> listOcupantes) {
+        if (apartamento == null || fechaEntrada == null || fechaSalida == null
+                || listOcupantes == null || !fechaSalida.isAfter(fechaEntrada)) {
+            return "Datos inválidos para cotizar.";
+        }
+
+        int ocupantesQuePagan = 0;
+        int ocupantesMenores = 0;
+        for (Ocupante o : listOcupantes) {
+            if (o != null) {
+                if (o.pagaTarifa(fechaEntrada)) ocupantesQuePagan++;
+                else ocupantesMenores++;
+            }
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Cotización Apartamento: ").append(apartamento.getNombreApartamento())
+                .append(" (").append(apartamento.getIdApartamento()).append(")\n");
+        sb.append("Ocupantes totales: ").append(listOcupantes.size())
+                .append(" (Pagan: ").append(ocupantesQuePagan)
+                .append(" | Menores < 6 años gratis: ").append(ocupantesMenores).append(")\n");
+        sb.append("-------------------------------------------------------------\n");
+
+        int total = 0;
+        LocalDate fechaActual = fechaEntrada;
+        while (fechaActual.isBefore(fechaSalida)) {
+            EstadoTemporada temp = determinarTemporadaFecha(fechaActual, temporadas);
+            int tarifaNochePersona = apartamento.getTarifaPorTemporada(temp);
+            int subtotalNoche = tarifaNochePersona * ocupantesQuePagan;
+            total += subtotalNoche;
+
+            sb.append(String.format("Noche %s | Temp: %-5s | Tarifa/Pers: $%d | Subtotal: $%d COP\n",
+                    fechaActual, temp, tarifaNochePersona, subtotalNoche));
+            fechaActual = fechaActual.plusDays(1);
+        }
+
+        sb.append("-------------------------------------------------------------\n");
+        sb.append(String.format("TOTAL ESTANCIA: $%d COP\n", total));
+        return sb.toString();
     }
 
-    public int calcularServiciosAdicionales (){
-        return 0;
+    public int calcularPrecioAlojamiento(Apartamento apartamento, ArrayList<Temporada> temporadas,
+                                         LocalDate fechaEntrada, LocalDate fechaSalida,
+                                         ArrayList<Ocupante> listOcupantes) {
+        if (apartamento == null || fechaEntrada == null || fechaSalida == null
+                || listOcupantes == null || !fechaSalida.isAfter(fechaEntrada)) {
+            return 0;
+        }
 
+        int cantidadOcupantesQuePagan = 0;
+        for (Ocupante o : listOcupantes) {
+            if (o != null && o.pagaTarifa(fechaEntrada)) {
+                cantidadOcupantesQuePagan++;
+            }
+        }
 
+        int precioAlojamientoTotal = 0;
+        LocalDate fechaActual = fechaEntrada;
+
+        while (fechaActual.isBefore(fechaSalida)) {
+            EstadoTemporada temp = determinarTemporadaFecha(fechaActual, temporadas);
+            int tarifaTemporadaNoche = apartamento.getTarifaPorTemporada(temp);
+            precioAlojamientoTotal += tarifaTemporadaNoche * cantidadOcupantesQuePagan;
+            fechaActual = fechaActual.plusDays(1);
+        }
+
+        return precioAlojamientoTotal;
     }
-    public int calcularPenalidades(){
-        return 0;
 
-    }
-    public int registrarPagos (Pago pago){
-        return 0;
-
-    }
-    public int calcularTotalCargos(){
-        return 0;
-
-    }
-    public int calcularTotalPagos(){
-        return 0;
-
-    }
-    public int calcularSaldoPendiente(){
-        return 0;
-
+    public void registrarCargo(Cargo cargo) {
+        if (cargo != null && cargo.getValorCargo() != 0) {
+            listCargos.add(cargo);
+        }
     }
 
+    public void registrarMovimientoContrarioCargo(Cargo cargoOriginal, String motivo) {
+        if (cargoOriginal != null) {
+            listCargos.add(new Cargo("Reverso (" + motivo + "): " + cargoOriginal.getConcepto(),
+                    -cargoOriginal.getValorCargo()));
+        }
+    }
+
+    public void registrarPago(Pago pago) {
+        if (pago != null && pago.valorPago() != 0) {
+            listPagos.add(pago);
+        }
+    }
+
+    public int calcularTotalCargos() {
+        int total = 0;
+        for (Cargo c : listCargos) total += c.getValorCargo();
+        return total;
+    }
+
+    public int calcularTotalPagos() {
+        int total = 0;
+        for (Pago p : listPagos) total += p.valorPago();
+        return total;
+    }
+
+    public int calcularSaldoPendiente() {
+        return calcularTotalCargos() - calcularTotalPagos();
+    }
+
+    // getters and setters
+    public String getIdFolio() { return idFolio; }
+    public ArrayList<Cargo> getListCargos() { return new ArrayList<>(listCargos); }
+    public ArrayList<Pago> getListPagos() { return new ArrayList<>(listPagos); }
 }
