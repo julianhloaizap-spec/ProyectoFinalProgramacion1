@@ -92,4 +92,30 @@ class FolioTest {
         Assertions.assertEquals(0, folio.calcularTotalCargos());
         LOG.info("Finalizando prueba movimientoContrarioCorrigeSinEliminarCargos...");
     }
+
+    // Verifica que no se permitan pagos que superen el saldo pendiente ni nuevos pagos
+    // cuando el saldo ya es cero, pero sí permita abonar si se agrega un nuevo cargo después.
+    @DisplayName("Prueba bloqueo de pagos con saldo cero y reactivación con nuevo cargo")
+    @Test
+    void bloquearPagosConSaldoCeroYPermitirSiHayNuevoCargo() {
+        LOG.info("Iniciando prueba bloquearPagosConSaldoCeroYPermitirSiHayNuevoCargo...");
+        folio.registrarCargo(new Cargo("Alojamiento", 200000));
+
+        Assertions.assertTrue(folio.registrarPago(new Pago(MedioPago.EFECTIVO, 150000)));
+        Assertions.assertEquals(50000, folio.calcularSaldoPendiente());
+
+        Assertions.assertFalse(folio.registrarPago(new Pago(MedioPago.EFECTIVO, 60000)));
+        Assertions.assertEquals(50000, folio.calcularSaldoPendiente());
+
+        Assertions.assertTrue(folio.registrarPago(new Pago(MedioPago.TARJETA, 50000)));
+        Assertions.assertEquals(0, folio.calcularSaldoPendiente());
+        Assertions.assertFalse(folio.registrarPago(new Pago(MedioPago.EFECTIVO, 10000)));
+
+        folio.registrarCargo(new Cargo("Servicio adicional", 30000));
+        Assertions.assertEquals(30000, folio.calcularSaldoPendiente());
+        Assertions.assertTrue(folio.registrarPago(new Pago(MedioPago.TRANSFERENCIA, 30000)));
+        Assertions.assertEquals(0, folio.calcularSaldoPendiente());
+        Assertions.assertFalse(folio.registrarPago(new Pago(MedioPago.EFECTIVO, 1)));
+        LOG.info("Finalizando prueba bloquearPagosConSaldoCeroYPermitirSiHayNuevoCargo...");
+    }
 }

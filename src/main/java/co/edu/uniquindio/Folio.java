@@ -4,12 +4,10 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 
 public class Folio {
-    //atributos
     private final String idFolio;
     private final ArrayList<Cargo> listCargos;
     private final ArrayList<Pago> listPagos;
 
-    //constructor
     public Folio(String idFolio) {
         this.idFolio = idFolio != null ? idFolio.trim() : "";
         this.listCargos = new ArrayList<>();
@@ -44,13 +42,12 @@ public class Folio {
             }
         }
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("Cotización Apartamento: ").append(apartamento.getNombreApartamento())
-                .append(" (").append(apartamento.getIdApartamento()).append(")\n");
-        sb.append("Ocupantes totales: ").append(listOcupantes.size())
-                .append(" (Pagan: ").append(ocupantesQuePagan)
-                .append(" | Menores < 6 años gratis: ").append(ocupantesMenores).append(")\n");
-        sb.append("-------------------------------------------------------------\n");
+        String desglose = "Cotización Apartamento: " + apartamento.getNombreApartamento()
+                + " (" + apartamento.getIdApartamento() + ")\n"
+                + "Ocupantes totales: " + listOcupantes.size()
+                + " (Pagan: " + ocupantesQuePagan
+                + " | Menores < 6 años gratis: " + ocupantesMenores + ")\n"
+                + "-------------------------------------------------------------\n";
 
         int total = 0;
         LocalDate fechaActual = fechaEntrada;
@@ -60,14 +57,14 @@ public class Folio {
             int subtotalNoche = tarifaNochePersona * ocupantesQuePagan;
             total += subtotalNoche;
 
-            sb.append(String.format("Noche %s | Temp: %-5s | Tarifa/Pers: $%d | Subtotal: $%d COP\n",
-                    fechaActual, temp, tarifaNochePersona, subtotalNoche));
+            desglose += String.format("Noche %s | Temp: %-5s | Tarifa/Pers: $%d | Subtotal: $%d COP\n",
+                    fechaActual, temp, tarifaNochePersona, subtotalNoche);
             fechaActual = fechaActual.plusDays(1);
         }
 
-        sb.append("-------------------------------------------------------------\n");
-        sb.append(String.format("TOTAL ESTANCIA: $%d COP\n", total));
-        return sb.toString();
+        desglose += "-------------------------------------------------------------\n"
+                + String.format("TOTAL ESTANCIA: $%d COP\n", total);
+        return desglose;
     }
 
     public int calcularPrecioAlojamiento(Apartamento apartamento, ArrayList<Temporada> temporadas,
@@ -111,10 +108,15 @@ public class Folio {
         }
     }
 
-    public void registrarPago(Pago pago) {
-        if (pago != null && pago.valorPago() != 0) {
-            listPagos.add(pago);
+    public boolean registrarPago(Pago pago) {
+        if (pago == null || pago.valorPago() <= 0) {
+            return false;
         }
+        int saldoPendiente = calcularSaldoPendiente();
+        if (saldoPendiente <= 0 || pago.valorPago() > saldoPendiente) {
+            return false;
+        }
+        return listPagos.add(pago);
     }
 
     public int calcularTotalCargos() {
@@ -133,7 +135,6 @@ public class Folio {
         return calcularTotalCargos() - calcularTotalPagos();
     }
 
-    // getters and setters
     public String getIdFolio() { return idFolio; }
     public ArrayList<Cargo> getListCargos() { return new ArrayList<>(listCargos); }
     public ArrayList<Pago> getListPagos() { return new ArrayList<>(listPagos); }

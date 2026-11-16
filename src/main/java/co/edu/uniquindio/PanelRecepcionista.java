@@ -4,6 +4,7 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 
 public class PanelRecepcionista extends JPanel {
@@ -19,7 +20,7 @@ public class PanelRecepcionista extends JPanel {
     private JTextField txtDocTitular, txtCodApto, txtEntrada, txtSalida, txtCodExterno, txtCantAdultos, txtCantMenores;
     private JComboBox<Canal> cbCanal;
 
-    private JTextField txtFolioIdReserva, txtServicioNombre, txtServicioValor, txtPagoMonto;
+    private JTextField txtFolioIdReserva, txtServicioNombre, txtServicioValor, txtServicioCantidad, txtPagoMonto;
     private JComboBox<MedioPago> cbMedioPago;
     private JTextArea txtAreaFolio;
 
@@ -129,11 +130,12 @@ public class PanelRecepcionista extends JPanel {
     private JPanel crearTabFolios() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
 
-        JPanel sup = new JPanel(new GridLayout(3, 4, 6, 6));
+        JPanel sup = new JPanel(new GridLayout(4, 4, 6, 6));
         sup.setBorder(BorderFactory.createTitledBorder("Gestión de Folio (Cargos Adicionales y Pagos)"));
 
         txtFolioIdReserva = new JTextField("RES-001");
         txtServicioNombre = new JTextField("Desayuno Típico");
+        txtServicioCantidad = new JTextField("1");
         txtServicioValor = new JTextField("25000");
         txtPagoMonto = new JTextField("100000");
         cbMedioPago = new JComboBox<>(MedioPago.values());
@@ -147,8 +149,13 @@ public class PanelRecepcionista extends JPanel {
 
         sup.add(new JLabel("ID Reserva:")); sup.add(txtFolioIdReserva);
         sup.add(btnVerFolio); sup.add(new JLabel(""));
+
         sup.add(new JLabel("Servicio / Concepto:")); sup.add(txtServicioNombre);
-        sup.add(new JLabel("Valor Cargo ($):")); sup.add(txtServicioValor);
+        sup.add(new JLabel("Cantidad:")); sup.add(txtServicioCantidad);
+
+        sup.add(new JLabel("Valor Unitario ($):")); sup.add(txtServicioValor);
+        sup.add(new JLabel("")); sup.add(new JLabel(""));
+
         sup.add(new JLabel("Monto Pago ($):")); sup.add(txtPagoMonto);
         sup.add(new JLabel("Medio Pago:")); sup.add(cbMedioPago);
 
@@ -297,49 +304,85 @@ public class PanelRecepcionista extends JPanel {
             txtAreaFolio.setText("Reserva no encontrada.");
             return;
         }
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         Folio f = r.getFolio();
-        StringBuilder sb = new StringBuilder();
-        sb.append("FOLIO: ").append(f.getIdFolio()).append(" | Titular: ").append(r.getInfoTitular().getNombreUsuario())
-                .append(" | Estado: ").append(r.getEstadoReserva()).append("\n");
-        sb.append("-------------------------------------------------------------\nCARGOS:\n");
+        String detalle = "FOLIO: " + f.getIdFolio() + " | Titular: " + r.getInfoTitular().getNombreUsuario()
+                + " | Estado: " + r.getEstadoReserva() + "\n";
+        detalle += "--------------------------------------------------------------------------------------------\nCARGOS:\n";
         for (Cargo c : f.getListCargos()) {
-            sb.append(String.format("  - [%s] %-30s : $%d COP\n", c.getIdCargo(), c.getConcepto(), c.getValorCargo()));
+            detalle += String.format("  - [%s | %s] %-45s : $%d COP\n",
+                    c.getIdCargo(), c.getFechaCargo().format(fmt), c.getConcepto(), c.getValorCargo());
         }
-        sb.append("PAGOS:\n");
+        detalle += "PAGOS:\n";
         for (Pago p : f.getListPagos()) {
-            sb.append(String.format("  - [%s] Pago %-15s        : $%d COP\n", p.idPago(), p.medioPago(), p.valorPago()));
+            detalle += String.format("  - [%s | %s] Pago %-39s : $%d COP\n",
+                    p.idPago(), p.fechaPago().format(fmt), p.medioPago(), p.valorPago());
         }
-        sb.append("-------------------------------------------------------------\n");
-        sb.append(String.format("TOTAL CARGOS: $%d | TOTAL PAGOS: $%d | SALDO PENDIENTE: $%d COP\n",
-                f.calcularTotalCargos(), f.calcularTotalPagos(), f.calcularSaldoPendiente()));
-        txtAreaFolio.setText(sb.toString());
+        detalle += "--------------------------------------------------------------------------------------------\n";
+        detalle += String.format("TOTAL CARGOS: $%d | TOTAL PAGOS: $%d | SALDO PENDIENTE: $%d COP\n",
+                f.calcularTotalCargos(), f.calcularTotalPagos(), f.calcularSaldoPendiente());
+        txtAreaFolio.setText(detalle);
     }
 
     private void cargarServicioAdicional() {
         try {
             String idRes = txtFolioIdReserva.getText().trim();
             String concepto = txtServicioNombre.getText().trim();
-            int valor = Integer.parseInt(txtServicioValor.getText().trim());
-            ServicioAdicional srv = new ServicioAdicional(concepto, valor);
+            int valorUnitario = Integer.parseInt(txtServicioValor.getText().trim());
+            int cantidad = Integer.parseInt(txtServicioCantidad.getText().trim());
+
+            ServicioAdicional srv = new ServicioAdicional(concepto, valorUnitario, cantidad);
+            if (!srv.esValido()) {
+                JOptionPane.showMessageDialog(this, "Ingrese un concepto válido, valor unitario mayor a $0 y cantidad mayor a 0.", "Datos Inválidos", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             if (alojamiento.registrarCargoFacturable(idRes, srv)) {
-                JOptionPane.showMessageDialog(this, "Cargo cargado al folio.");
+                JOptionPane.showMessageDialog(this, "Cargo cargado al folio (" + cantidad + " x $" + valorUnitario + " COP).");
+                txtServicioCantidad.setText("1");
                 consultarFolio();
                 refrescarTodo();
             } else {
                 JOptionPane.showMessageDialog(this, "Reserva no encontrada.", "Error", JOptionPane.ERROR_MESSAGE);
             }
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Valor numérico inválido.", "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Valor unitario o cantidad numérica inválida.", "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     private void registrarPago() {
         try {
             String idRes = txtFolioIdReserva.getText().trim();
+            Reserva r = alojamiento.buscarReserva(idRes);
+            if (r == null) {
+                JOptionPane.showMessageDialog(this, "Reserva no encontrada.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            if (r.getEstadoReserva() == EstadoReserva.CANCELADA || r.getEstadoReserva() == EstadoReserva.NO_SHOW) {
+                JOptionPane.showMessageDialog(this, "No se pueden registrar pagos sobre una reserva cancelada o en No-Show.", "Operación no permitida", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            int saldoPendiente = r.getFolio().calcularSaldoPendiente();
+            if (saldoPendiente <= 0) {
+                JOptionPane.showMessageDialog(this, "Esta reserva ya tiene saldo pendiente en $0. No se pueden agregar más pagos.", "Saldo Saldado", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+
             int monto = Integer.parseInt(txtPagoMonto.getText().trim());
+            if (monto <= 0) {
+                JOptionPane.showMessageDialog(this, "El monto del pago debe ser mayor a $0.", "Monto Inválido", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            if (monto > saldoPendiente) {
+                JOptionPane.showMessageDialog(this, "El monto supera el saldo pendiente actual ($" + saldoPendiente + " COP).", "Monto Excedido", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             MedioPago medio = (MedioPago) cbMedioPago.getSelectedItem();
             if (alojamiento.registrarPagoReserva(idRes, medio, monto)) {
-                JOptionPane.showMessageDialog(this, "Pago registrado.");
+                JOptionPane.showMessageDialog(this, "Pago registrado exitosamente.");
                 consultarFolio();
                 refrescarTodo();
             } else {
@@ -389,13 +432,12 @@ public class PanelRecepcionista extends JPanel {
         String cod = (String) modeloAptos.getValueAt(fila, 0);
         Apartamento a = alojamiento.buscarApartamento(cod);
         if (a == null) return;
-        StringBuilder sb = new StringBuilder();
+        String historial = "";
         for (Novedad n : a.getListNovedades()) {
-            sb.append("[").append(n.getIdNovedad()).append(" | ").append(n.getFechaRegistro().toLocalDate())
-                    .append(" - ").append(n.getRegistradoPor()).append("]: ")
-                    .append(n.getDescripcion()).append("\n");
+            historial += "[" + n.getIdNovedad() + " | " + n.getFechaRegistro().toLocalDate()
+                    + " - " + n.getRegistradoPor() + "]: " + n.getDescripcion() + "\n";
         }
-        txtHistorialNovedades.setText(sb.toString());
+        txtHistorialNovedades.setText(historial);
     }
 
     public void refrescarTodo() {

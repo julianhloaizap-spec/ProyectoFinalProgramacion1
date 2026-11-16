@@ -338,9 +338,19 @@ public class Alojamiento {
     public boolean registrarPagoReserva(String idReserva, MedioPago medioPago, int monto) {
         Reserva r = buscarReserva(idReserva);
         if (r == null || monto <= 0 || medioPago == null) return false;
+        if (r.getEstadoReserva() == EstadoReserva.CANCELADA || r.getEstadoReserva() == EstadoReserva.NO_SHOW) {
+            return false;
+        }
+
+        int saldoPendiente = r.getFolio().calcularSaldoPendiente();
+        if (saldoPendiente <= 0 || monto > saldoPendiente) {
+            return false;
+        }
 
         Pago pago = new Pago(medioPago, monto);
-        r.getFolio().registrarPago(pago);
+        if (!r.getFolio().registrarPago(pago)) {
+            return false;
+        }
 
         if (r.getCanal() == Canal.PORTAL && r.getEstadoReserva() == EstadoReserva.PENDIENTE) {
             if (r.getFolio().calcularTotalPagos() >= r.calcularAnticipoMinimoPortal()) {
@@ -359,7 +369,7 @@ public class Alojamiento {
     }
 
     public String generarReporteOcupacion() {
-        StringBuilder sb = new StringBuilder("=== REPORTE DE OCUPACIÓN POR APARTAMENTO ===\n");
+        String reporte = "=== REPORTE DE OCUPACIÓN POR APARTAMENTO ===\n";
         for (Apartamento a : listApartamentos) {
             long totalReservas = 0;
             long nochesVendidas = 0;
@@ -372,10 +382,10 @@ public class Alojamiento {
                     nochesVendidas += ChronoUnit.DAYS.between(r.getFechaEntrada(), r.getFechaSalida());
                 }
             }
-            sb.append(String.format("- %s (%s): %d reservas efectivas | %d noches vendidas | Estado: %s\n",
-                    a.getNombreApartamento(), a.getIdApartamento(), totalReservas, nochesVendidas, a.getEstadoOperativo()));
+            reporte += String.format("- %s (%s): %d reservas efectivas | %d noches vendidas | Estado: %s\n",
+                    a.getNombreApartamento(), a.getIdApartamento(), totalReservas, nochesVendidas, a.getEstadoOperativo());
         }
-        return sb.toString();
+        return reporte;
     }
 
     public String generarReporteIngresosPeriodo(LocalDate inicio, LocalDate fin) {
@@ -397,7 +407,7 @@ public class Alojamiento {
     }
 
     public String generarReporteReservasPorCanal() {
-        StringBuilder sb = new StringBuilder("=== REPORTE DE RESERVAS POR CANAL ===\n");
+        String reporte = "=== REPORTE DE RESERVAS POR CANAL ===\n";
         for (Canal c : Canal.values()) {
             long total = 0, canceladas = 0, noShow = 0;
             for (Reserva r : listReservas) {
@@ -407,36 +417,36 @@ public class Alojamiento {
                     if (r.getEstadoReserva() == EstadoReserva.NO_SHOW) noShow++;
                 }
             }
-            sb.append(String.format("- Canal %-8s: Total = %d | Canceladas = %d | No-Show = %d\n",
-                    c, total, canceladas, noShow));
+            reporte += String.format("- Canal %-8s: Total = %d | Canceladas = %d | No-Show = %d\n",
+                    c, total, canceladas, noShow);
         }
-        return sb.toString();
+        return reporte;
     }
 
     public String generarReporteSaldosPendientes() {
-        StringBuilder sb = new StringBuilder("=== REPORTE DE SALDOS PENDIENTES ===\n");
+        String reporte = "=== REPORTE DE SALDOS PENDIENTES ===\n";
         for (Reserva r : listReservas) {
             if (r.getEstadoReserva().esActiva()) {
                 int saldo = r.getFolio().calcularSaldoPendiente();
                 if (saldo > 0) {
-                    sb.append(String.format("- Reserva %s | Titular: %s | Apto: %s | Saldo Pendiente: $%d COP\n",
+                    reporte += String.format("- Reserva %s | Titular: %s | Apto: %s | Saldo Pendiente: $%d COP\n",
                             r.getIdReserva(), r.getInfoTitular().getNombreUsuario(),
-                            r.getApartamento().getIdApartamento(), saldo));
+                            r.getApartamento().getIdApartamento(), saldo);
                 }
             }
         }
-        return sb.toString();
+        return reporte;
     }
 
     public String generarReporteApartamentosConMasNovedades() {
         ArrayList<Apartamento> ordenados = new ArrayList<>(listApartamentos);
         ordenados.sort((a, b) -> Integer.compare(b.getListNovedades().size(), a.getListNovedades().size()));
-        StringBuilder sb = new StringBuilder("=== APARTAMENTOS CON MÁS NOVEDADES ===\n");
+        String reporte = "=== APARTAMENTOS CON MÁS NOVEDADES ===\n";
         for (Apartamento a : ordenados) {
-            sb.append(String.format("- %s (%s): %d novedades registradas\n",
-                    a.getNombreApartamento(), a.getIdApartamento(), a.getListNovedades().size()));
+            reporte += String.format("- %s (%s): %d novedades registradas\n",
+                    a.getNombreApartamento(), a.getIdApartamento(), a.getListNovedades().size());
         }
-        return sb.toString();
+        return reporte;
     }
 
     public Reserva buscarReserva(String idReserva) {

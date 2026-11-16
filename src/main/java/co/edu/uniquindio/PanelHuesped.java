@@ -7,6 +7,7 @@ import java.awt.*;
 import java.io.File;
 import java.net.URL;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 
@@ -23,7 +24,6 @@ public class PanelHuesped extends JPanel {
     private DefaultTableModel modeloDisponibles;
     private final ArrayList<Apartamento> apartamentosDisponiblesActuales = new ArrayList<>();
 
-    // Galería integrada junto a la cotización
     private JLabel lblNombreAptoGaleria;
     private JLabel lblFotoApto;
     private JLabel lblContadorFotosApto;
@@ -103,7 +103,6 @@ public class PanelHuesped extends JPanel {
     private JPanel crearTabReservar() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
 
-        // 1. Filtros de búsqueda
         JPanel filtro = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
         filtro.setBorder(BorderFactory.createTitledBorder("Búsqueda de Apartamentos Disponibles"));
         txtBusqEntrada = new JTextField(LocalDate.now().plusDays(1).toString(), 10);
@@ -118,7 +117,6 @@ public class PanelHuesped extends JPanel {
         filtro.add(btnBuscar);
         panel.add(filtro, BorderLayout.NORTH);
 
-        // 2. Tabla central de apartamentos disponibles (ancho completo)
         String[] cols = {"Código", "Nombre", "Dormitorios", "Cap. Máx", "Características", "Tarifa Base/Pers"};
         modeloDisponibles = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
@@ -132,11 +130,9 @@ public class PanelHuesped extends JPanel {
         });
         panel.add(new JScrollPane(tablaDisponibles), BorderLayout.CENTER);
 
-        // 3. Zona inferior: Ocupantes (Izquierda) + Cotización (Centro) + Fotos del Apartamento (Derecha)
         JPanel inferior = new JPanel(new BorderLayout(10, 10));
         inferior.setPreferredSize(new Dimension(0, 290));
 
-        // 3A. Ocupantes
         JPanel panelOcupantes = new JPanel(new BorderLayout(5, 5));
         panelOcupantes.setBorder(BorderFactory.createTitledBorder("Ocupantes (< 6 años gratis, ocupan cupo)"));
         panelOcupantes.setPreferredSize(new Dimension(330, 0));
@@ -157,7 +153,6 @@ public class PanelHuesped extends JPanel {
         panelOcupantes.add(formOcup, BorderLayout.NORTH);
         panelOcupantes.add(new JScrollPane(new JList<>(modeloListaOcupantes)), BorderLayout.CENTER);
 
-        // 3B. Cotización noche por noche
         JPanel panelCotizar = new JPanel(new BorderLayout(5, 5));
         panelCotizar.setBorder(BorderFactory.createTitledBorder("Cotización Noche por Noche y Confirmación"));
         txtCotizacion = new JTextArea();
@@ -176,7 +171,6 @@ public class PanelHuesped extends JPanel {
         panelCotizar.add(new JScrollPane(txtCotizacion), BorderLayout.CENTER);
         panelCotizar.add(botonesAccion, BorderLayout.SOUTH);
 
-        // 3C. Galería de fotos junto a la cotización
         JPanel panelGaleria = new JPanel(new BorderLayout(5, 5));
         panelGaleria.setBorder(BorderFactory.createTitledBorder("Fotos del Apartamento"));
         panelGaleria.setPreferredSize(new Dimension(300, 0));
@@ -504,17 +498,23 @@ public class PanelHuesped extends JPanel {
         Reserva r = alojamiento.buscarReserva(idReserva);
         if (r == null) return;
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("Folio: ").append(r.getFolio().getIdFolio()).append(" | Estado: ").append(r.getEstadoReserva()).append("\n");
-        sb.append("Cargos:\n");
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        String detalle = "Folio: " + r.getFolio().getIdFolio() + " | Estado: " + r.getEstadoReserva() + "\n";
+        detalle += "Cargos:\n";
         for (Cargo c : r.getFolio().getListCargos()) {
-            sb.append("  - [").append(c.getIdCargo()).append("] ").append(c.getConcepto()).append(": $").append(c.getValorCargo()).append("\n");
+            detalle += "  - [" + c.getIdCargo() + " | " + c.getFechaCargo().format(fmt) + "] "
+                    + c.getConcepto() + ": $" + c.getValorCargo() + "\n";
         }
-        sb.append("Pagos:\n");
+        detalle += "Pagos:\n";
         for (Pago p : r.getFolio().getListPagos()) {
-            sb.append("  - [").append(p.idPago()).append("] [").append(p.medioPago()).append("] $").append(p.valorPago()).append("\n");
+            detalle += "  - [" + p.idPago() + " | " + p.fechaPago().format(fmt) + "] ["
+                    + p.medioPago() + "] $" + p.valorPago() + "\n";
         }
-        txtDetalleFolio.setText(sb.toString());
+        detalle += "-------------------------------------------------------------------------------\n";
+        detalle += "Total Cargos: $" + r.getFolio().calcularTotalCargos()
+                + " | Total Pagado: $" + r.getFolio().calcularTotalPagos()
+                + " | Saldo Pendiente: $" + r.getFolio().calcularSaldoPendiente() + " COP\n";
+        txtDetalleFolio.setText(detalle);
     }
 
     private void abonarReservaSeleccionada() {
@@ -525,7 +525,30 @@ public class PanelHuesped extends JPanel {
         }
         try {
             String idReserva = (String) modeloMisReservas.getValueAt(fila, 0);
+            Reserva r = alojamiento.buscarReserva(idReserva);
+            if (r == null) return;
+
+            if (r.getEstadoReserva() == EstadoReserva.CANCELADA || r.getEstadoReserva() == EstadoReserva.NO_SHOW) {
+                JOptionPane.showMessageDialog(this, "No se pueden registrar pagos sobre una reserva cancelada o en No-Show.", "Operación no permitida", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            int saldoPendiente = r.getFolio().calcularSaldoPendiente();
+            if (saldoPendiente <= 0) {
+                JOptionPane.showMessageDialog(this, "Esta reserva ya tiene saldo pendiente en $0. No se pueden agregar más pagos.", "Saldo Saldado", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+
             int monto = Integer.parseInt(txtMontoAbono.getText().trim());
+            if (monto <= 0) {
+                JOptionPane.showMessageDialog(this, "El monto del abono debe ser mayor a $0.", "Monto Inválido", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            if (monto > saldoPendiente) {
+                JOptionPane.showMessageDialog(this, "El monto supera el saldo pendiente actual ($" + saldoPendiente + " COP).", "Monto Excedido", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             MedioPago medio = (MedioPago) cbMedioPago.getSelectedItem();
 
             if (alojamiento.registrarPagoReserva(idReserva, medio, monto)) {

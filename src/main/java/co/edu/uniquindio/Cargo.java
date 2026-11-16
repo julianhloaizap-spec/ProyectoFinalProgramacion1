@@ -11,14 +11,29 @@ public class Cargo {
     private final LocalDateTime fechaCargo;
 
     public Cargo(String concepto, int valorCargo) {
-        this.idCargo = String.format("CARG-%03d", ++contador);
-        this.concepto = concepto;
-        this.valorCargo = valorCargo;
-        this.fechaCargo = LocalDateTime.now();
+        this(concepto, valorCargo, LocalDateTime.now());
     }
 
-    public String getIdCargo() { return idCargo; }
-    public String getConcepto() { return concepto; }
-    public int getValorCargo() { return valorCargo; }
-    public LocalDateTime getFechaCargo() { return fechaCargo; }
+    public Cargo(String concepto, int valorCargo, LocalDateTime fechaCargo) {
+        this.idCargo = String.format("CAR-%03d", ++contador);
+        this.concepto = concepto != null ? concepto.trim() : "";
+        this.valorCargo = valorCargo;
+        this.fechaCargo = fechaCargo != null ? fechaCargo : LocalDateTime.now();
+    }
+
+    public String getIdCargo() {
+        return idCargo;
+    }
+
+    public String getConcepto() {
+        return concepto;
+    }
+
+    public int getValorCargo() {
+        return valorCargo;
+    }
+
+    public LocalDateTime getFechaCargo() {
+        return fechaCargo;
+    }
 }
