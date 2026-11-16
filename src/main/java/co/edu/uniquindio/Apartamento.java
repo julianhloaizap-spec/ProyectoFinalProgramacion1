@@ -59,6 +59,35 @@ public class Apartamento {
         }
     }
 
+    public boolean actualizarDatos(String nombre, int dormitorios, int capacidad,
+                                   String caracteristicas, int tarifaBase,
+                                   int tarifaMedia, int tarifaAlta) {
+        if (nombre == null || nombre.isBlank() || dormitorios <= 0 || capacidad <= 0 || tarifaBase <= 0) {
+            return false;
+        }
+        this.nombreApartamento = nombre.trim();
+        this.numeroDormitorios = dormitorios;
+        this.capacidaMaxPersonas = capacidad;
+        this.caracteristicas = caracteristicas != null ? caracteristicas.trim() : "";
+        this.tarifaPersona = tarifaBase;
+        recalcularTarifasPorDefecto();
+
+        if (tarifaMedia > 0) {
+            setTarifaTemporada(EstadoTemporada.MEDIA, tarifaMedia);
+        }
+        if (tarifaAlta > 0) {
+            setTarifaTemporada(EstadoTemporada.ALTA, tarifaAlta);
+        }
+        return true;
+    }
+
+    public void setTarifaPersona(int tarifaPersona) {
+        if (tarifaPersona > 0) {
+            this.tarifaPersona = tarifaPersona;
+            recalcularTarifasPorDefecto();
+        }
+    }
+
     public void setTarifaTemporada(EstadoTemporada temporada, int valorPorPersonaNoche) {
         if (temporada != null && valorPorPersonaNoche > 0) {
             tarifasPorTemporada[temporada.ordinal()] = valorPorPersonaNoche;
@@ -124,6 +153,16 @@ public class Apartamento {
 
     public void registrarNovedad(Novedad novedad) {
         if (novedad != null) listNovedades.add(novedad);
+    }
+
+    public Novedad buscarNovedad(String idNovedad) {
+        if (idNovedad == null) return null;
+        for (Novedad n : listNovedades) {
+            if (n.getIdNovedad().equalsIgnoreCase(idNovedad.trim())) {
+                return n;
+            }
+        }
+        return null;
     }
 
     public void agregarBloqueo(Bloqueo bloqueo) {

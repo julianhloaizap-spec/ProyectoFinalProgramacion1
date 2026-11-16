@@ -53,6 +53,66 @@ public class Alojamiento {
         return null;
     }
 
+    public boolean actualizarDatosTitular(String idTitular, String nombre, String correo, String telefono) {
+        Usuario u = buscarUsuario(idTitular);
+        if (u instanceof Titular t) {
+            if (nombre == null || nombre.isBlank() || correo == null || correo.isBlank()
+                    || telefono == null || telefono.isBlank()) {
+                return false;
+            }
+            t.setNombreUsuario(nombre.trim());
+            t.setCorreoUsuario(correo.trim());
+            t.setTelefonoUsuario(telefono.trim());
+            return true;
+        }
+        return false;
+    }
+
+    public ArrayList<Titular> getListTitulares() {
+        ArrayList<Titular> resultado = new ArrayList<>();
+        for (Usuario u : listUsuarios) {
+            if (u instanceof Titular t) resultado.add(t);
+        }
+        return resultado;
+    }
+
+    public ArrayList<Reserva> filtrarReservasHuespedes(String categoria, String textoBusqueda) {
+        ArrayList<Reserva> resultado = new ArrayList<>();
+        String filtro = textoBusqueda != null ? textoBusqueda.trim().toLowerCase() : "";
+
+        for (Reserva r : listReservas) {
+            boolean cumpleCategoria = switch (categoria) {
+                case "HOSPEDADOS" -> r.getEstadoReserva() == EstadoReserva.EN_CURSO;
+                case "ACTIVOS" -> r.getEstadoReserva().esActiva();
+                case "HISTORIAL" -> !r.getEstadoReserva().esActiva();
+                default -> true;
+            };
+
+            if (!cumpleCategoria) continue;
+
+            if (!filtro.isEmpty()) {
+                Titular t = r.getInfoTitular();
+                boolean coincide = r.getIdReserva().toLowerCase().contains(filtro)
+                        || t.getIdUsuario().toLowerCase().contains(filtro)
+                        || t.getNombreUsuario().toLowerCase().contains(filtro)
+                        || r.getApartamento().getIdApartamento().toLowerCase().contains(filtro);
+
+                if (!coincide) {
+                    for (Ocupante oc : r.getListOcupantes()) {
+                        if (oc.getNombreOcupante().toLowerCase().contains(filtro)) {
+                            coincide = true;
+                            break;
+                        }
+                    }
+                }
+                if (!coincide) continue;
+            }
+
+            resultado.add(r);
+        }
+        return resultado;
+    }
+
     public boolean actualizarRecepcionista(String idRecepcionista, String nombre, String correo,
                                            String telefono, String contrasenia) {
         Usuario u = buscarUsuario(idRecepcionista);
@@ -86,6 +146,19 @@ public class Alojamiento {
     public boolean registrarApartamento(Apartamento apartamento) {
         if (apartamento != null && apartamento.esValido() && buscarApartamento(apartamento.getIdApartamento()) == null) {
             return listApartamentos.add(apartamento);
+        }
+        return false;
+    }
+
+    public boolean actualizarApartamento(String idApartamento, String nombre, int dormitorios,
+                                         int capacidad, String caracteristicas,
+                                         int tarifaBase, int tarifaMedia, int tarifaAlta) {
+        if (idApartamento == null) return false;
+        for (Apartamento a : listApartamentos) {
+            if (a.getIdApartamento().equalsIgnoreCase(idApartamento.trim())) {
+                return a.actualizarDatos(nombre, dormitorios, capacidad, caracteristicas,
+                        tarifaBase, tarifaMedia, tarifaAlta);
+            }
         }
         return false;
     }
@@ -126,6 +199,20 @@ public class Alojamiento {
         Novedad nov = new Novedad(descripcion.trim(), registradoPor);
         apto.registrarNovedad(nov);
         return true;
+    }
+
+    public boolean solucionarNovedadApartamento(String idApartamento, String idNovedad,
+                                                String solucion, String solucionadoPor) {
+        if (idApartamento == null || idNovedad == null) return false;
+        for (Apartamento a : listApartamentos) {
+            if (a.getIdApartamento().equalsIgnoreCase(idApartamento.trim())) {
+                Novedad nov = a.buscarNovedad(idNovedad);
+                if (nov != null) {
+                    return nov.registrarSolucion(solucion, solucionadoPor);
+                }
+            }
+        }
+        return false;
     }
 
     public boolean agregarFotoApartamento(String idApartamento, String rutaFoto) {

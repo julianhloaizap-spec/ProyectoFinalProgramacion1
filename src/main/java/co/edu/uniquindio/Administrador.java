@@ -29,7 +29,19 @@ public class Administrador extends Usuario {
         return alojamiento != null && alojamiento.registrarApartamento(apartamento);
     }
 
+    public boolean editarApartamento(Alojamiento alojamiento, String idApartamento, String nombre,
+                                     int dormitorios, int capacidad, String caracteristicas,
+                                     int tarifaBase, int tarifaMedia, int tarifaAlta) {
+        return alojamiento != null && alojamiento.actualizarApartamento(
+                idApartamento, nombre, dormitorios, capacidad, caracteristicas, tarifaBase, tarifaMedia, tarifaAlta);
+    }
+
     public boolean eliminarApartamentoLogico(Alojamiento alojamiento, String idApartamento) {
         return alojamiento != null && alojamiento.eliminarApartamentoLogico(idApartamento);
+    }
+
+    public boolean solucionarNovedad(Alojamiento alojamiento, String idApartamento, String idNovedad, String solucion) {
+        return alojamiento != null && alojamiento.solucionarNovedadApartamento(
+                idApartamento, idNovedad, solucion, getNombreUsuario());
     }
 }

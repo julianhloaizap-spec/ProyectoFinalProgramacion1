@@ -4,9 +4,13 @@ import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.io.File;
 import java.net.URL;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 
 public class PanelAdministrador extends JPanel {
@@ -16,6 +20,7 @@ public class PanelAdministrador extends JPanel {
     private Administrador adminActual;
 
     private JLabel lblBienvenida;
+    private boolean actualizandoTablas = false;
 
     private JTable tablaEmpleados;
     private DefaultTableModel modeloEmpleados;
@@ -24,8 +29,8 @@ public class PanelAdministrador extends JPanel {
     private JTable tablaAptos;
     private DefaultTableModel modeloAptos;
     private JTextField txtAptoNombre, txtAptoDorm, txtAptoCap, txtAptoCaract, txtTarifaBaja, txtTarifaMedia, txtTarifaAlta;
+    private int ultimoPrecioBaseCargado = 100000;
 
-    // Gestión de fotos de apartamentos (sin Map)
     private DefaultListModel<String> modeloListaFotosApto;
     private JList<String> listaFotosApto;
     private final ArrayList<String> rutasFotosMostradas = new ArrayList<>();
@@ -40,6 +45,14 @@ public class PanelAdministrador extends JPanel {
 
     private JTextField txtRepInicio, txtRepFin;
     private JTextArea txtAreaReportes;
+
+    private JComboBox<String> cbFiltroAptoNovedad;
+    private JTextField txtFiltroFechaNovedad;
+    private JCheckBox chkSoloPendientes;
+    private JTable tablaNovedades;
+    private DefaultTableModel modeloNovedades;
+    private JTextArea txtDetalleNovedad;
+    private JTextArea txtSolucionNovedad;
 
     public PanelAdministrador(Alojamiento alojamiento, VentanaPrincipal ventanaPrincipal) {
         this.alojamiento = alojamiento;
@@ -71,6 +84,7 @@ public class PanelAdministrador extends JPanel {
         tabs.addTab("2. Apartamentos y Tarifas", crearTabApartamentos());
         tabs.addTab("3. Temporadas, Bloqueos y Política", crearTabConfiguracion());
         tabs.addTab("4. Reportes Gerenciales", crearTabReportes());
+        tabs.addTab("5. Novedades y Soluciones", crearTabNovedades());
         add(tabs, BorderLayout.CENTER);
     }
 
@@ -137,25 +151,25 @@ public class PanelAdministrador extends JPanel {
     private JPanel crearTabApartamentos() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
 
-        String[] cols = {"Código", "Nombre", "Dorm.", "Cap.", "Tarifa Baja", "Tarifa Media", "Tarifa Alta", "Fotos", "Activo"};
+        String[] cols = {"Código", "Nombre", "Dorm.", "Cap.", "Precio Base (Baja)", "Tarifa Media", "Tarifa Alta", "Fotos", "Activo"};
         modeloAptos = new DefaultTableModel(cols, 0) {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
         tablaAptos = new JTable(modeloAptos);
         tablaAptos.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tablaAptos.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
+            if (!e.getValueIsAdjusting() && !actualizandoTablas) {
+                cargarDatosApartamentoSeleccionado();
                 actualizarPanelFotosSegunSeleccion();
             }
         });
         panel.add(new JScrollPane(tablaAptos), BorderLayout.CENTER);
 
-        // Panel inferior dividido: izquierda datos del apartamento, derecha galería de fotos
         JPanel inferior = new JPanel(new BorderLayout(10, 10));
-        inferior.setPreferredSize(new Dimension(0, 235));
+        inferior.setPreferredSize(new Dimension(0, 245));
 
         JPanel form = new JPanel(new GridLayout(5, 4, 6, 6));
-        form.setBorder(BorderFactory.createTitledBorder("Crear / Configurar Apartamentos (Código Automático)"));
+        form.setBorder(BorderFactory.createTitledBorder("Crear o Editar Apartamento (Seleccione en la tabla para editar)"));
 
         txtAptoNombre = new JTextField();
         txtAptoDorm = new JTextField("2");
@@ -164,6 +178,13 @@ public class PanelAdministrador extends JPanel {
         txtTarifaBaja = new JTextField("100000");
         txtTarifaMedia = new JTextField("130000");
         txtTarifaAlta = new JTextField("150000");
+
+        txtTarifaBaja.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusLost(FocusEvent e) {
+                recalcularCamposTemporadaDesdeBase();
+            }
+        });
 
         JButton btnCrear = new JButton("Crear Apartamento");
         btnCrear.addActionListener(e -> {
@@ -182,9 +203,7 @@ public class PanelAdministrador extends JPanel {
                 if (adminActual.crearApartamento(alojamiento, a)) {
                     JOptionPane.showMessageDialog(this, "Apartamento creado con código: " + a.getIdApartamento()
                             + " (" + a.getListFotos().size() + " foto(s) asociada(s)).");
-                    txtAptoNombre.setText("");
-                    rutasFotosNuevoApto.clear();
-                    tablaAptos.clearSelection();
+                    limpiarFormularioApartamento();
                     refrescarTablas();
                     actualizarPanelFotosSegunSeleccion();
                 } else {
@@ -194,6 +213,10 @@ public class PanelAdministrador extends JPanel {
                 JOptionPane.showMessageDialog(this, "Revise los valores numéricos.", "Error", JOptionPane.ERROR_MESSAGE);
             }
         });
+
+        JButton btnGuardarEdicion = new JButton("Guardar Cambios");
+        btnGuardarEdicion.setFont(new Font("SansSerif", Font.BOLD, 12));
+        btnGuardarEdicion.addActionListener(e -> editarApartamentoSeleccionado());
 
         JButton btnEliminar = new JButton("Eliminación Lógica");
         btnEliminar.addActionListener(e -> {
@@ -206,12 +229,14 @@ public class PanelAdministrador extends JPanel {
                 } else {
                     JOptionPane.showMessageDialog(this, "No se puede eliminar si tiene reservas activas.", "Error", JOptionPane.ERROR_MESSAGE);
                 }
+            } else {
+                JOptionPane.showMessageDialog(this, "Seleccione un apartamento de la tabla.", "Atención", JOptionPane.WARNING_MESSAGE);
             }
         });
 
-        JButton btnModoNuevo = new JButton("Limpiar Selección");
+        JButton btnModoNuevo = new JButton("Limpiar / Nuevo");
         btnModoNuevo.addActionListener(e -> {
-            tablaAptos.clearSelection();
+            limpiarFormularioApartamento();
             actualizarPanelFotosSegunSeleccion();
         });
 
@@ -219,14 +244,13 @@ public class PanelAdministrador extends JPanel {
         form.add(new JLabel("Dormitorios:")); form.add(txtAptoDorm);
         form.add(new JLabel("Capacidad Máx:")); form.add(txtAptoCap);
         form.add(new JLabel("Características:")); form.add(txtAptoCaract);
-        form.add(new JLabel("Tarifa Temp. Baja ($):")); form.add(txtTarifaBaja);
+        form.add(new JLabel("Precio Base / Baja ($):")); form.add(txtTarifaBaja);
         form.add(new JLabel("Tarifa Temp. Media ($):")); form.add(txtTarifaMedia);
         form.add(new JLabel("Tarifa Temp. Alta ($):")); form.add(txtTarifaAlta);
         form.add(new JLabel("")); form.add(new JLabel(""));
-        form.add(btnCrear); form.add(btnEliminar);
-        form.add(btnModoNuevo); form.add(new JLabel(""));
+        form.add(btnCrear); form.add(btnGuardarEdicion);
+        form.add(btnEliminar); form.add(btnModoNuevo);
 
-        // Panel derecho: Gestión y vista previa de fotografías
         JPanel panelFotos = new JPanel(new BorderLayout(6, 6));
         panelFotos.setBorder(BorderFactory.createTitledBorder("Fotografías del Apartamento"));
         panelFotos.setPreferredSize(new Dimension(370, 0));
@@ -267,6 +291,81 @@ public class PanelAdministrador extends JPanel {
         panel.add(inferior, BorderLayout.SOUTH);
 
         return panel;
+    }
+
+    private void recalcularCamposTemporadaDesdeBase() {
+        try {
+            int nuevaBase = Integer.parseInt(txtTarifaBaja.getText().trim());
+            if (nuevaBase > 0 && nuevaBase != ultimoPrecioBaseCargado) {
+                ultimoPrecioBaseCargado = nuevaBase;
+                txtTarifaMedia.setText(String.valueOf((nuevaBase * EstadoTemporada.MEDIA.getPorcentajePorDefecto()) / 100));
+                txtTarifaAlta.setText(String.valueOf((nuevaBase * EstadoTemporada.ALTA.getPorcentajePorDefecto()) / 100));
+            }
+        } catch (NumberFormatException ignored) {
+        }
+    }
+
+    private void cargarDatosApartamentoSeleccionado() {
+        Apartamento seleccionado = obtenerApartamentoSeleccionadoTabla();
+        if (seleccionado == null) {
+            return;
+        }
+        txtAptoNombre.setText(seleccionado.getNombreApartamento());
+        txtAptoDorm.setText(String.valueOf(seleccionado.getNumeroDormitorios()));
+        txtAptoCap.setText(String.valueOf(seleccionado.getCapacidaMaxPersonas()));
+        txtAptoCaract.setText(seleccionado.getCaracteristicas());
+
+        int base = seleccionado.getTarifaPersona();
+        ultimoPrecioBaseCargado = base;
+        txtTarifaBaja.setText(String.valueOf(base));
+        txtTarifaMedia.setText(String.valueOf(seleccionado.getTarifaPorTemporada(EstadoTemporada.MEDIA)));
+        txtTarifaAlta.setText(String.valueOf(seleccionado.getTarifaPorTemporada(EstadoTemporada.ALTA)));
+    }
+
+    private void limpiarFormularioApartamento() {
+        tablaAptos.clearSelection();
+        txtAptoNombre.setText("");
+        txtAptoDorm.setText("2");
+        txtAptoCap.setText("4");
+        txtAptoCaract.setText("Balcón, Vista a montaña");
+        ultimoPrecioBaseCargado = 100000;
+        txtTarifaBaja.setText("100000");
+        txtTarifaMedia.setText("130000");
+        txtTarifaAlta.setText("150000");
+        rutasFotosNuevoApto.clear();
+    }
+
+    private void editarApartamentoSeleccionado() {
+        Apartamento seleccionado = obtenerApartamentoSeleccionadoTabla();
+        if (seleccionado == null) {
+            JOptionPane.showMessageDialog(this, "Seleccione un apartamento de la tabla para editar.", "Atención", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        try {
+            String nombre = txtAptoNombre.getText().trim();
+            int dormitorios = Integer.parseInt(txtAptoDorm.getText().trim());
+            int capacidad = Integer.parseInt(txtAptoCap.getText().trim());
+            String caracteristicas = txtAptoCaract.getText().trim();
+            int tarifaBase = Integer.parseInt(txtTarifaBaja.getText().trim());
+            int tarifaMedia = Integer.parseInt(txtTarifaMedia.getText().trim());
+            int tarifaAlta = Integer.parseInt(txtTarifaAlta.getText().trim());
+
+            if (adminActual.editarApartamento(alojamiento, seleccionado.getIdApartamento(),
+                    nombre, dormitorios, capacidad, caracteristicas, tarifaBase, tarifaMedia, tarifaAlta)) {
+                int filaActual = tablaAptos.getSelectedRow();
+                JOptionPane.showMessageDialog(this,
+                        "Apartamento " + seleccionado.getIdApartamento() + " actualizado correctamente.\n"
+                                + "Nuevo precio base: $" + tarifaBase + " COP/persona.");
+                refrescarTablas();
+                if (filaActual >= 0 && filaActual < tablaAptos.getRowCount()) {
+                    tablaAptos.setRowSelectionInterval(filaActual, filaActual);
+                }
+            } else {
+                JOptionPane.showMessageDialog(this, "Verifique que el nombre no esté vacío y los valores numéricos sean mayores a 0.", "Datos Inválidos", JOptionPane.WARNING_MESSAGE);
+            }
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(this, "Revise los valores numéricos de dormitorios, capacidad y tarifas.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private Apartamento obtenerApartamentoSeleccionadoTabla() {
@@ -519,13 +618,13 @@ public class PanelAdministrador extends JPanel {
 
         JButton btnConf = new JButton("Conflictos Canal Externo");
         btnConf.addActionListener(e -> {
-            StringBuilder sb = new StringBuilder("=== CONFLICTOS DE CANAL EXTERNO REGISTRADOS ===\n");
+            String reporte = "=== CONFLICTOS DE CANAL EXTERNO REGISTRADOS ===\n";
             for (ConflictoCanal c : alojamiento.getListConflictosCanal()) {
-                sb.append(String.format("- [%s] Cód.Ext: %s | Apto: %s (%s a %s) -> %s\n",
+                reporte += String.format("- [%s] Cód.Ext: %s | Apto: %s (%s a %s) -> %s\n",
                         c.getIdConflicto(), c.getCodigoExterno(), c.getIdApartamento(),
-                        c.getFechaEntrada(), c.getFechaSalida(), c.getMotivo()));
+                        c.getFechaEntrada(), c.getFechaSalida(), c.getMotivo());
             }
-            txtAreaReportes.setText(sb.toString());
+            txtAreaReportes.setText(reporte);
         });
 
         botones.add(new JLabel("Desde:")); botones.add(txtRepInicio);
@@ -546,24 +645,244 @@ public class PanelAdministrador extends JPanel {
         return panel;
     }
 
-    private void refrescarTablas() {
-        modeloEmpleados.setRowCount(0);
-        for (Recepcionista r : alojamiento.getListRecepcionistas()) {
-            modeloEmpleados.addRow(new Object[]{
-                    r.getIdUsuario(), r.getNombreUsuario(), r.getCorreoUsuario(), r.getTelefonoUsuario(), r.isActivo() ? "Sí" : "No"
-            });
+    private JPanel crearTabNovedades() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+
+        JPanel barraFiltro = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        barraFiltro.setBorder(BorderFactory.createTitledBorder("Filtrar Novedades por Apartamento y Fecha"));
+
+        cbFiltroAptoNovedad = new JComboBox<>();
+        cbFiltroAptoNovedad.addItem("TODOS");
+
+        txtFiltroFechaNovedad = new JTextField(10);
+        chkSoloPendientes = new JCheckBox("Solo pendientes");
+
+        JButton btnFiltrar = new JButton("Buscar / Filtrar");
+        btnFiltrar.addActionListener(e -> actualizarTablaNovedades());
+
+        JButton btnHoy = new JButton("Fecha Hoy");
+        btnHoy.addActionListener(e -> {
+            txtFiltroFechaNovedad.setText(LocalDate.now().toString());
+            actualizarTablaNovedades();
+        });
+
+        JButton btnLimpiarFiltros = new JButton("Mostrar Todas");
+        btnLimpiarFiltros.addActionListener(e -> {
+            cbFiltroAptoNovedad.setSelectedIndex(0);
+            txtFiltroFechaNovedad.setText("");
+            chkSoloPendientes.setSelected(false);
+            actualizarTablaNovedades();
+        });
+
+        barraFiltro.add(new JLabel("Apartamento:"));
+        barraFiltro.add(cbFiltroAptoNovedad);
+        barraFiltro.add(new JLabel("Fecha (YYYY-MM-DD):"));
+        barraFiltro.add(txtFiltroFechaNovedad);
+        barraFiltro.add(btnHoy);
+        barraFiltro.add(chkSoloPendientes);
+        barraFiltro.add(btnFiltrar);
+        barraFiltro.add(btnLimpiarFiltros);
+
+        panel.add(barraFiltro, BorderLayout.NORTH);
+
+        String[] cols = {"ID Novedad", "Cód. Apto", "Apartamento", "Fecha Reporte", "Reportado Por", "Estado"};
+        modeloNovedades = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+        tablaNovedades = new JTable(modeloNovedades);
+        tablaNovedades.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tablaNovedades.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                mostrarDetalleNovedadSeleccionada();
+            }
+        });
+        panel.add(new JScrollPane(tablaNovedades), BorderLayout.CENTER);
+
+        JPanel sur = new JPanel(new GridLayout(1, 2, 10, 10));
+        sur.setPreferredSize(new Dimension(0, 210));
+
+        txtDetalleNovedad = new JTextArea();
+        txtDetalleNovedad.setEditable(false);
+        txtDetalleNovedad.setLineWrap(true);
+        txtDetalleNovedad.setWrapStyleWord(true);
+        txtDetalleNovedad.setFont(new Font("Monospaced", Font.PLAIN, 12));
+        JScrollPane scrollDetalle = new JScrollPane(txtDetalleNovedad);
+        scrollDetalle.setBorder(BorderFactory.createTitledBorder("Detalle Completo de la Novedad"));
+
+        JPanel panelSolucion = new JPanel(new BorderLayout(6, 6));
+        panelSolucion.setBorder(BorderFactory.createTitledBorder("Dar Solución a la Novedad Seleccionada"));
+
+        txtSolucionNovedad = new JTextArea();
+        txtSolucionNovedad.setLineWrap(true);
+        txtSolucionNovedad.setWrapStyleWord(true);
+        txtSolucionNovedad.setFont(new Font("SansSerif", Font.PLAIN, 12));
+
+        JButton btnGuardarSolucion = new JButton("Registrar Solución");
+        btnGuardarSolucion.setFont(new Font("SansSerif", Font.BOLD, 12));
+        btnGuardarSolucion.addActionListener(e -> solucionarNovedadSeleccionada());
+
+        panelSolucion.add(new JLabel("Descripción de la solución aplicada:"), BorderLayout.NORTH);
+        panelSolucion.add(new JScrollPane(txtSolucionNovedad), BorderLayout.CENTER);
+        panelSolucion.add(btnGuardarSolucion, BorderLayout.SOUTH);
+
+        sur.add(scrollDetalle);
+        sur.add(panelSolucion);
+        panel.add(sur, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private void actualizarComboApartamentosNovedades() {
+        Object seleccionPrevia = cbFiltroAptoNovedad.getSelectedItem();
+        cbFiltroAptoNovedad.removeAllItems();
+        cbFiltroAptoNovedad.addItem("TODOS");
+        for (Apartamento a : alojamiento.getListApartamentos()) {
+            cbFiltroAptoNovedad.addItem(a.getIdApartamento() + " - " + a.getNombreApartamento());
+        }
+        if (seleccionPrevia != null) {
+            cbFiltroAptoNovedad.setSelectedItem(seleccionPrevia);
+        }
+    }
+
+    private void actualizarTablaNovedades() {
+        String filtroApto = cbFiltroAptoNovedad.getSelectedItem() != null
+                ? cbFiltroAptoNovedad.getSelectedItem().toString() : "TODOS";
+        String codAptoFiltro = filtroApto.equals("TODOS") ? "" : filtroApto.split(" - ")[0].trim();
+
+        LocalDate fechaFiltro = null;
+        String textoFecha = txtFiltroFechaNovedad.getText().trim();
+        if (!textoFecha.isEmpty()) {
+            try {
+                fechaFiltro = LocalDate.parse(textoFecha);
+            } catch (DateTimeParseException ex) {
+                JOptionPane.showMessageDialog(this, "Formato de fecha inválido. Use YYYY-MM-DD.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
         }
 
-        modeloAptos.setRowCount(0);
+        boolean soloPendientes = chkSoloPendientes.isSelected();
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        modeloNovedades.setRowCount(0);
         for (Apartamento a : alojamiento.getListApartamentos()) {
-            modeloAptos.addRow(new Object[]{
-                    a.getIdApartamento(), a.getNombreApartamento(), a.getNumeroDormitorios(), a.getCapacidaMaxPersonas(),
-                    "$" + a.getTarifaPorTemporada(EstadoTemporada.BAJA),
-                    "$" + a.getTarifaPorTemporada(EstadoTemporada.MEDIA),
-                    "$" + a.getTarifaPorTemporada(EstadoTemporada.ALTA),
-                    a.getListFotos().size() + " foto(s)",
-                    a.isActivo() ? "Sí" : "No"
-            });
+            if (!codAptoFiltro.isEmpty() && !a.getIdApartamento().equalsIgnoreCase(codAptoFiltro)) {
+                continue;
+            }
+            for (Novedad n : a.getListNovedades()) {
+                if (fechaFiltro != null && !n.getFechaRegistro().toLocalDate().equals(fechaFiltro)) {
+                    continue;
+                }
+                if (soloPendientes && n.isSolucionada()) {
+                    continue;
+                }
+                modeloNovedades.addRow(new Object[]{
+                        n.getIdNovedad(),
+                        a.getIdApartamento(),
+                        a.getNombreApartamento(),
+                        n.getFechaRegistro().format(fmt),
+                        n.getRegistradoPor(),
+                        n.isSolucionada() ? "SOLUCIONADA" : "PENDIENTE"
+                });
+            }
+        }
+
+        if (modeloNovedades.getRowCount() > 0) {
+            tablaNovedades.setRowSelectionInterval(0, 0);
+            mostrarDetalleNovedadSeleccionada();
+        } else {
+            txtDetalleNovedad.setText("No se encontraron novedades con los filtros seleccionados.");
+        }
+    }
+
+    private void mostrarDetalleNovedadSeleccionada() {
+        int fila = tablaNovedades.getSelectedRow();
+        if (fila < 0) {
+            txtDetalleNovedad.setText("");
+            return;
+        }
+        String idNovedad = (String) modeloNovedades.getValueAt(fila, 0);
+        String codApto = (String) modeloNovedades.getValueAt(fila, 1);
+
+        Apartamento apto = null;
+        for (Apartamento a : alojamiento.getListApartamentos()) {
+            if (a.getIdApartamento().equalsIgnoreCase(codApto)) {
+                apto = a;
+                break;
+            }
+        }
+        if (apto == null) return;
+
+        Novedad nov = apto.buscarNovedad(idNovedad);
+        if (nov == null) return;
+
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        String detalle = "ID Novedad   : " + nov.getIdNovedad() + "\n"
+                + "Apartamento  : " + apto.getIdApartamento() + " — " + apto.getNombreApartamento() + "\n"
+                + "Fecha Reporte: " + nov.getFechaRegistro().format(fmt) + "\n"
+                + "Reportado por: " + nov.getRegistradoPor() + "\n"
+                + "Estado Actual: " + (nov.isSolucionada() ? "SOLUCIONADA" : "PENDIENTE") + "\n"
+                + "--------------------------------------------------\n"
+                + "Detalle del reporte:\n" + nov.getDescripcion() + "\n";
+
+        if (nov.isSolucionada()) {
+            detalle += "--------------------------------------------------\n"
+                    + "Fecha Solución : " + nov.getFechaSolucion().format(fmt) + "\n"
+                    + "Solucionado por: " + nov.getSolucionadoPor() + "\n"
+                    + "Solución       :\n" + nov.getSolucion() + "\n";
+        }
+        txtDetalleNovedad.setText(detalle);
+    }
+
+    private void solucionarNovedadSeleccionada() {
+        int fila = tablaNovedades.getSelectedRow();
+        if (fila < 0) {
+            JOptionPane.showMessageDialog(this, "Seleccione una novedad de la tabla.", "Atención", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        String idNovedad = (String) modeloNovedades.getValueAt(fila, 0);
+        String codApto = (String) modeloNovedades.getValueAt(fila, 1);
+        String solucion = txtSolucionNovedad.getText().trim();
+
+        if (solucion.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Ingrese la descripción de la solución aplicada.", "Campo Obligatorio", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        if (adminActual.solucionarNovedad(alojamiento, codApto, idNovedad, solucion)) {
+            JOptionPane.showMessageDialog(this, "Solución registrada correctamente para la novedad " + idNovedad + ".");
+            txtSolucionNovedad.setText("");
+            actualizarTablaNovedades();
+        } else {
+            JOptionPane.showMessageDialog(this, "No se pudo registrar la solución.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void refrescarTablas() {
+        actualizandoTablas = true;
+        try {
+            modeloEmpleados.setRowCount(0);
+            for (Recepcionista r : alojamiento.getListRecepcionistas()) {
+                modeloEmpleados.addRow(new Object[]{
+                        r.getIdUsuario(), r.getNombreUsuario(), r.getCorreoUsuario(), r.getTelefonoUsuario(), r.isActivo() ? "Sí" : "No"
+                });
+            }
+
+            modeloAptos.setRowCount(0);
+            for (Apartamento a : alojamiento.getListApartamentos()) {
+                modeloAptos.addRow(new Object[]{
+                        a.getIdApartamento(), a.getNombreApartamento(), a.getNumeroDormitorios(), a.getCapacidaMaxPersonas(),
+                        "$" + a.getTarifaPersona(),
+                        "$" + a.getTarifaPorTemporada(EstadoTemporada.MEDIA),
+                        "$" + a.getTarifaPorTemporada(EstadoTemporada.ALTA),
+                        a.getListFotos().size() + " foto(s)",
+                        a.isActivo() ? "Sí" : "No"
+                });
+            }
+
+            actualizarComboApartamentosNovedades();
+            actualizarTablaNovedades();
+        } finally {
+            actualizandoTablas = false;
         }
     }
 }

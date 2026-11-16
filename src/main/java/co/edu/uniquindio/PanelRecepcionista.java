@@ -4,7 +4,9 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.time.LocalDate;
+import java.time.Period;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 
 public class PanelRecepcionista extends JPanel {
@@ -14,11 +16,17 @@ public class PanelRecepcionista extends JPanel {
     private Recepcionista recepcionistaActual;
 
     private JLabel lblBienvenida;
+    private boolean actualizandoTablas = false;
 
     private JTable tablaReservas;
     private DefaultTableModel modeloReservas;
-    private JTextField txtDocTitular, txtCodApto, txtEntrada, txtSalida, txtCodExterno, txtCantAdultos, txtCantMenores;
+    private JTextField txtDocTitular, txtCodApto, txtEntrada, txtSalida, txtCodExterno;
     private JComboBox<Canal> cbCanal;
+
+    // Gestión de ocupantes al crear una reserva en recepción
+    private JTextField txtOcupNombre, txtOcupFechaNac;
+    private DefaultListModel<String> modeloListaOcupantes;
+    private final ArrayList<Ocupante> ocupantesReservaNueva = new ArrayList<>();
 
     private JTextField txtFolioIdReserva, txtServicioNombre, txtServicioValor, txtServicioCantidad, txtPagoMonto;
     private JComboBox<MedioPago> cbMedioPago;
@@ -30,6 +38,16 @@ public class PanelRecepcionista extends JPanel {
     private JTextField txtDescripcionNovedad;
     private JTextArea txtHistorialNovedades;
 
+    private JComboBox<String> cbFiltroHuespedes;
+    private JTextField txtBuscarHuesped;
+    private JTable tablaHuespedes;
+    private DefaultTableModel modeloHuespedes;
+    private JTextField txtHuespedDoc, txtHuespedNombre, txtHuespedTel, txtHuespedCorreo;
+    private JLabel lblInfoEstadiaHuesped;
+    private JTable tablaOcupantesHuesped;
+    private DefaultTableModel modeloOcupantesHuesped;
+    private JTextField txtNuevoOcupNombre, txtNuevoOcupFechaNac;
+
     public PanelRecepcionista(Alojamiento alojamiento, VentanaPrincipal ventanaPrincipal) {
         this.alojamiento = alojamiento;
         this.ventanaPrincipal = ventanaPrincipal;
@@ -39,6 +57,7 @@ public class PanelRecepcionista extends JPanel {
     public void cargarDatosRecepcionista(Recepcionista recepcionista) {
         this.recepcionistaActual = recepcionista;
         lblBienvenida.setText("Panel de Recepción — Operador(a): " + recepcionista.getNombreUsuario());
+        limpiarFormularioReserva();
         refrescarTodo();
     }
 
@@ -59,6 +78,7 @@ public class PanelRecepcionista extends JPanel {
         tabs.addTab("1. Reservas (Directa / Externa) y Check-In/Out", crearTabReservas());
         tabs.addTab("2. Folios, Servicios y Pagos", crearTabFolios());
         tabs.addTab("3. Estado Apartamentos y Novedades", crearTabApartamentos());
+        tabs.addTab("4. Huéspedes y Ocupantes", crearTabHuespedes());
         add(tabs, BorderLayout.CENTER);
     }
 
@@ -90,19 +110,18 @@ public class PanelRecepcionista extends JPanel {
         barraAcciones.add(btnNoShow);
         barraAcciones.add(btnCancelar);
 
+        // Panel izquierdo: Datos principales de la reserva
         JPanel form = new JPanel(new GridLayout(5, 4, 6, 6));
-        form.setBorder(BorderFactory.createTitledBorder("Cotizar y Registrar Reserva Presencial / Telefónica / Externa (ID Automático)"));
+        form.setBorder(BorderFactory.createTitledBorder("Datos de la Reserva (ID Automático)"));
 
-        txtDocTitular = new JTextField("1094123456");
-        txtCodApto = new JTextField("APT-001");
+        txtDocTitular = new JTextField();
+        txtCodApto = new JTextField();
         cbCanal = new JComboBox<>(new Canal[]{Canal.DIRECTA, Canal.EXTERNA});
-        txtEntrada = new JTextField(LocalDate.now().toString());
-        txtSalida = new JTextField(LocalDate.now().plusDays(2).toString());
+        txtEntrada = new JTextField();
+        txtSalida = new JTextField();
         txtCodExterno = new JTextField();
-        txtCantAdultos = new JTextField("2");
-        txtCantMenores = new JTextField("0");
 
-        JButton btnNuevoTitular = new JButton("+ Registrar Titular Rápido");
+        JButton btnNuevoTitular = new JButton("+ Registrar Titular");
         btnNuevoTitular.addActionListener(e -> dialogoRegistroRapidoTitular());
 
         JButton btnCotizar = new JButton("Cotizar Estancia");
@@ -112,23 +131,161 @@ public class PanelRecepcionista extends JPanel {
         btnCrear.setFont(new Font("SansSerif", Font.BOLD, 12));
         btnCrear.addActionListener(e -> crearReservaRecepcion(true));
 
+        JButton btnLimpiarForm = new JButton("Limpiar Todo");
+        btnLimpiarForm.addActionListener(e -> limpiarFormularioReserva());
+
         form.add(new JLabel("Doc. Titular:")); form.add(txtDocTitular);
         form.add(new JLabel("Código Apto:")); form.add(txtCodApto);
         form.add(new JLabel("Canal:")); form.add(cbCanal);
-        form.add(new JLabel("Cód. Plataforma Externa:")); form.add(txtCodExterno);
+        form.add(new JLabel("Cód. Plataforma Ext.:")); form.add(txtCodExterno);
         form.add(new JLabel("Entrada (YYYY-MM-DD):")); form.add(txtEntrada);
         form.add(new JLabel("Salida (YYYY-MM-DD):")); form.add(txtSalida);
-        form.add(new JLabel("Adultos (>=6 años):")); form.add(txtCantAdultos);
-        form.add(new JLabel("Menores (<6 años):")); form.add(txtCantMenores);
+        form.add(new JLabel("")); form.add(new JLabel(""));
+        form.add(new JLabel("")); form.add(new JLabel(""));
         form.add(btnNuevoTitular); form.add(btnCotizar);
-        form.add(btnCrear); form.add(new JLabel(""));
+        form.add(btnCrear); form.add(btnLimpiarForm);
+
+        // Panel derecho: Registro de ocupantes de la reserva
+        JPanel panelOcupantes = new JPanel(new BorderLayout(5, 5));
+        panelOcupantes.setBorder(BorderFactory.createTitledBorder("Ocupantes de la Reserva (< 6 años gratis)"));
+        panelOcupantes.setPreferredSize(new Dimension(410, 0));
+
+        JPanel formOcup = new JPanel(new GridLayout(3, 2, 5, 4));
+        txtOcupNombre = new JTextField();
+        txtOcupFechaNac = new JTextField();
+
+        JButton btnAgregarOcup = new JButton("+ Agregar Ocupante");
+        btnAgregarOcup.addActionListener(e -> agregarOcupanteReservaNueva());
+
+        JButton btnIncluirTitular = new JButton("+ Incluir Titular");
+        btnIncluirTitular.addActionListener(e -> incluirTitularComoOcupante());
+
+        formOcup.add(new JLabel("Nombre Ocupante:")); formOcup.add(txtOcupNombre);
+        formOcup.add(new JLabel("Fecha Nac. (YYYY-MM-DD):")); formOcup.add(txtOcupFechaNac);
+        formOcup.add(btnAgregarOcup); formOcup.add(btnIncluirTitular);
+
+        modeloListaOcupantes = new DefaultListModel<>();
+        JList<String> listaOcupantes = new JList<>(modeloListaOcupantes);
+        listaOcupantes.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+
+        JPanel accionesListaOcup = new JPanel(new GridLayout(1, 2, 5, 0));
+        JButton btnQuitarOcup = new JButton("- Quitar Seleccionado");
+        btnQuitarOcup.addActionListener(e -> {
+            int idx = listaOcupantes.getSelectedIndex();
+            if (idx >= 0 && idx < ocupantesReservaNueva.size()) {
+                ocupantesReservaNueva.remove(idx);
+                modeloListaOcupantes.remove(idx);
+            } else {
+                JOptionPane.showMessageDialog(this, "Seleccione un ocupante de la lista para quitar.", "Atención", JOptionPane.WARNING_MESSAGE);
+            }
+        });
+        JButton btnLimpiarOcup = new JButton("Vaciar Lista");
+        btnLimpiarOcup.addActionListener(e -> {
+            ocupantesReservaNueva.clear();
+            modeloListaOcupantes.clear();
+            txtOcupNombre.setText("");
+            txtOcupFechaNac.setText("");
+        });
+        accionesListaOcup.add(btnQuitarOcup);
+        accionesListaOcup.add(btnLimpiarOcup);
+
+        panelOcupantes.add(formOcup, BorderLayout.NORTH);
+        panelOcupantes.add(new JScrollPane(listaOcupantes), BorderLayout.CENTER);
+        panelOcupantes.add(accionesListaOcup, BorderLayout.SOUTH);
+
+        JPanel contenedorFormularios = new JPanel(new BorderLayout(10, 5));
+        contenedorFormularios.setPreferredSize(new Dimension(0, 235));
+        contenedorFormularios.add(form, BorderLayout.CENTER);
+        contenedorFormularios.add(panelOcupantes, BorderLayout.EAST);
 
         JPanel sur = new JPanel(new BorderLayout(5, 5));
         sur.add(barraAcciones, BorderLayout.NORTH);
-        sur.add(form, BorderLayout.CENTER);
+        sur.add(contenedorFormularios, BorderLayout.CENTER);
         panel.add(sur, BorderLayout.SOUTH);
 
         return panel;
+    }
+
+    private void agregarOcupanteReservaNueva() {
+        String nombre = txtOcupNombre.getText().trim();
+        String fechaTexto = txtOcupFechaNac.getText().trim();
+
+        if (nombre.isEmpty() || fechaTexto.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Ingrese el nombre y la fecha de nacimiento del ocupante.", "Campos Incompletos", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        try {
+            LocalDate fechaNac = LocalDate.parse(fechaTexto);
+            Ocupante oc = new Ocupante(nombre, fechaNac);
+            if (!oc.esValido()) {
+                JOptionPane.showMessageDialog(this, "Los datos del ocupante no son válidos (revise que la fecha no sea futura).", "Datos Inválidos", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            ocupantesReservaNueva.add(oc);
+            modeloListaOcupantes.addElement(formatearEtiquetaOcupante(oc, false));
+            txtOcupNombre.setText("");
+            txtOcupFechaNac.setText("");
+            txtOcupNombre.requestFocus();
+        } catch (DateTimeParseException ex) {
+            JOptionPane.showMessageDialog(this, "Fecha de nacimiento inválida. Use formato YYYY-MM-DD.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void incluirTitularComoOcupante() {
+        String docTitular = txtDocTitular.getText().trim();
+        if (docTitular.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Ingrese primero el documento del titular.", "Campo Requerido", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        Usuario u = alojamiento.buscarUsuario(docTitular);
+        if (!(u instanceof Titular titular)) {
+            JOptionPane.showMessageDialog(this, "No se encontró un titular registrado con ese documento.", "Titular No Encontrado", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        for (Ocupante existente : ocupantesReservaNueva) {
+            if (existente.getNombreOcupante().equalsIgnoreCase(titular.getNombreUsuario())
+                    && existente.getFechaNacOcupante().equals(titular.getFechaNacTitular())) {
+                JOptionPane.showMessageDialog(this, "El titular ya se encuentra en la lista de ocupantes.", "Ya Registrado", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+        }
+
+        Ocupante ocTitular = new Ocupante(titular.getNombreUsuario(), titular.getFechaNacTitular());
+        ocupantesReservaNueva.add(ocTitular);
+        modeloListaOcupantes.addElement(formatearEtiquetaOcupante(ocTitular, true));
+    }
+
+    private String formatearEtiquetaOcupante(Ocupante oc, boolean esTitular) {
+        String etiqueta = oc.getNombreOcupante() + " (" + oc.getFechaNacOcupante() + ")";
+        String entradaTexto = txtEntrada.getText().trim();
+        if (!entradaTexto.isEmpty()) {
+            try {
+                LocalDate entrada = LocalDate.parse(entradaTexto);
+                etiqueta += oc.pagaTarifa(entrada) ? " - Paga tarifa" : " - Menor <6 años (Gratis)";
+            } catch (DateTimeParseException ignored) {
+            }
+        }
+        if (esTitular) {
+            etiqueta += " [Titular]";
+        }
+        return etiqueta;
+    }
+
+    private void limpiarFormularioReserva() {
+        txtDocTitular.setText("");
+        txtCodApto.setText("");
+        cbCanal.setSelectedIndex(0);
+        txtCodExterno.setText("");
+        txtEntrada.setText("");
+        txtSalida.setText("");
+        txtOcupNombre.setText("");
+        txtOcupFechaNac.setText("");
+        ocupantesReservaNueva.clear();
+        modeloListaOcupantes.clear();
     }
 
     private JPanel crearTabFolios() {
@@ -137,7 +294,7 @@ public class PanelRecepcionista extends JPanel {
         JPanel sup = new JPanel(new GridLayout(4, 4, 6, 6));
         sup.setBorder(BorderFactory.createTitledBorder("Gestión de Folio (Cargos Adicionales y Pagos)"));
 
-        txtFolioIdReserva = new JTextField("RES-001");
+        txtFolioIdReserva = new JTextField();
         txtServicioNombre = new JTextField();
         txtServicioCantidad = new JTextField();
         txtServicioValor = new JTextField();
@@ -218,12 +375,314 @@ public class PanelRecepcionista extends JPanel {
         return panel;
     }
 
+    private JPanel crearTabHuespedes() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+
+        JPanel barraFiltros = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 5));
+        barraFiltros.setBorder(BorderFactory.createTitledBorder("Lista de Huéspedes Activos, Hospedados e Historial"));
+
+        cbFiltroHuespedes = new JComboBox<>(new String[]{
+                "Todos (Activos e Historial)",
+                "Hospedados Actualmente (En Curso)",
+                "Reservas Activas (Pendiente / Confirmada / En Curso)",
+                "Historial (Finalizada / Cancelada / No-Show)"
+        });
+        cbFiltroHuespedes.addActionListener(e -> {
+            if (!actualizandoTablas) {
+                actualizarTablaHuespedes();
+            }
+        });
+
+        txtBuscarHuesped = new JTextField(16);
+        JButton btnBuscarHuesped = new JButton("Buscar");
+        btnBuscarHuesped.addActionListener(e -> actualizarTablaHuespedes());
+
+        JButton btnVerTodos = new JButton("Limpiar Filtro");
+        btnVerTodos.addActionListener(e -> {
+            cbFiltroHuespedes.setSelectedIndex(0);
+            txtBuscarHuesped.setText("");
+            actualizarTablaHuespedes();
+        });
+
+        JButton btnRegistrarTitular = new JButton("+ Nuevo Huésped Titular");
+        btnRegistrarTitular.addActionListener(e -> dialogoRegistroRapidoTitular());
+
+        barraFiltros.add(new JLabel("Mostrar:"));
+        barraFiltros.add(cbFiltroHuespedes);
+        barraFiltros.add(new JLabel("Doc / Nombre / Apto:"));
+        barraFiltros.add(txtBuscarHuesped);
+        barraFiltros.add(btnBuscarHuesped);
+        barraFiltros.add(btnVerTodos);
+        barraFiltros.add(btnRegistrarTitular);
+
+        panel.add(barraFiltros, BorderLayout.NORTH);
+
+        String[] colsHuespedes = {
+                "ID Reserva", "Doc. Titular", "Nombre Titular", "Teléfono",
+                "Apartamento", "Entrada", "Salida", "Estado", "Ocupantes"
+        };
+        modeloHuespedes = new DefaultTableModel(colsHuespedes, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+        tablaHuespedes = new JTable(modeloHuespedes);
+        tablaHuespedes.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        tablaHuespedes.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting() && !actualizandoTablas) {
+                mostrarDetalleHuespedYOcupantes();
+            }
+        });
+        panel.add(new JScrollPane(tablaHuespedes), BorderLayout.CENTER);
+
+        JPanel inferior = new JPanel(new GridLayout(1, 2, 10, 10));
+        inferior.setPreferredSize(new Dimension(0, 240));
+
+        JPanel panelTitular = new JPanel(new BorderLayout(6, 6));
+        panelTitular.setBorder(BorderFactory.createTitledBorder("Datos del Huésped Titular"));
+
+        lblInfoEstadiaHuesped = new JLabel("Seleccione un registro de la tabla superior");
+        lblInfoEstadiaHuesped.setFont(new Font("SansSerif", Font.BOLD, 11));
+        panelTitular.add(lblInfoEstadiaHuesped, BorderLayout.NORTH);
+
+        JPanel formTitular = new JPanel(new GridLayout(4, 2, 6, 6));
+        txtHuespedDoc = new JTextField();
+        txtHuespedDoc.setEditable(false);
+        txtHuespedNombre = new JTextField();
+        txtHuespedTel = new JTextField();
+        txtHuespedCorreo = new JTextField();
+
+        formTitular.add(new JLabel("Documento:")); formTitular.add(txtHuespedDoc);
+        formTitular.add(new JLabel("Nombre Completo:")); formTitular.add(txtHuespedNombre);
+        formTitular.add(new JLabel("Teléfono:")); formTitular.add(txtHuespedTel);
+        formTitular.add(new JLabel("Correo:")); formTitular.add(txtHuespedCorreo);
+        panelTitular.add(formTitular, BorderLayout.CENTER);
+
+        JButton btnActualizarTitular = new JButton("Guardar Datos del Titular");
+        btnActualizarTitular.addActionListener(e -> guardarDatosTitularSeleccionado());
+        panelTitular.add(btnActualizarTitular, BorderLayout.SOUTH);
+
+        JPanel panelOcupantes = new JPanel(new BorderLayout(6, 6));
+        panelOcupantes.setBorder(BorderFactory.createTitledBorder("Ocupantes de la Estadía / Reserva"));
+
+        String[] colsOcup = {"#", "Nombre Ocupante", "Fecha Nac.", "Edad Ingreso", "Tarifa"};
+        modeloOcupantesHuesped = new DefaultTableModel(colsOcup, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+        tablaOcupantesHuesped = new JTable(modeloOcupantesHuesped);
+        tablaOcupantesHuesped.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        panelOcupantes.add(new JScrollPane(tablaOcupantesHuesped), BorderLayout.CENTER);
+
+        JPanel formOcupantes = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 3));
+        txtNuevoOcupNombre = new JTextField(11);
+        txtNuevoOcupFechaNac = new JTextField(8);
+        JButton btnAddOcup = new JButton("+ Agregar");
+        btnAddOcup.addActionListener(e -> agregarOcupanteAReservaSeleccionada());
+        JButton btnDelOcup = new JButton("- Quitar");
+        btnDelOcup.addActionListener(e -> quitarOcupanteDeReservaSeleccionada());
+
+        formOcupantes.add(new JLabel("Nombre:"));
+        formOcupantes.add(txtNuevoOcupNombre);
+        formOcupantes.add(new JLabel("Nac (YYYY-MM-DD):"));
+        formOcupantes.add(txtNuevoOcupFechaNac);
+        formOcupantes.add(btnAddOcup);
+        formOcupantes.add(btnDelOcup);
+        panelOcupantes.add(formOcupantes, BorderLayout.SOUTH);
+
+        inferior.add(panelTitular);
+        inferior.add(panelOcupantes);
+        panel.add(inferior, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private String obtenerCodigoCategoriaHuespedes() {
+        int idx = cbFiltroHuespedes.getSelectedIndex();
+        return switch (idx) {
+            case 1 -> "HOSPEDADOS";
+            case 2 -> "ACTIVOS";
+            case 3 -> "HISTORIAL";
+            default -> "TODOS";
+        };
+    }
+
+    private void actualizarTablaHuespedes() {
+        String idSeleccionadoPrevio = null;
+        int filaPrevia = tablaHuespedes.getSelectedRow();
+        if (filaPrevia >= 0 && filaPrevia < modeloHuespedes.getRowCount()) {
+            idSeleccionadoPrevio = (String) modeloHuespedes.getValueAt(filaPrevia, 0);
+        }
+
+        String categoria = obtenerCodigoCategoriaHuespedes();
+        String busqueda = txtBuscarHuesped.getText();
+        ArrayList<Reserva> lista = alojamiento.filtrarReservasHuespedes(categoria, busqueda);
+
+        modeloHuespedes.setRowCount(0);
+        int filaRestaurar = -1;
+
+        for (Reserva r : lista) {
+            Titular t = r.getInfoTitular();
+            String etiquetaEstado = r.getEstadoReserva() == EstadoReserva.EN_CURSO
+                    ? "HOSPEDADO (EN_CURSO)"
+                    : r.getEstadoReserva().toString();
+
+            modeloHuespedes.addRow(new Object[]{
+                    r.getIdReserva(),
+                    t.getIdUsuario(),
+                    t.getNombreUsuario(),
+                    t.getTelefonoUsuario(),
+                    r.getApartamento().getIdApartamento() + " - " + r.getApartamento().getNombreApartamento(),
+                    r.getFechaEntrada(),
+                    r.getFechaSalida(),
+                    etiquetaEstado,
+                    r.getListOcupantes().size() + " / " + r.getApartamento().getCapacidaMaxPersonas()
+            });
+
+            if (idSeleccionadoPrevio != null && r.getIdReserva().equalsIgnoreCase(idSeleccionadoPrevio)) {
+                filaRestaurar = modeloHuespedes.getRowCount() - 1;
+            }
+        }
+
+        if (modeloHuespedes.getRowCount() > 0) {
+            int filaFinal = filaRestaurar >= 0 ? filaRestaurar : 0;
+            tablaHuespedes.setRowSelectionInterval(filaFinal, filaFinal);
+            mostrarDetalleHuespedYOcupantes();
+        } else {
+            limpiarDetalleHuespedYOcupantes();
+        }
+    }
+
+    private void limpiarDetalleHuespedYOcupantes() {
+        lblInfoEstadiaHuesped.setText("Sin registros para mostrar");
+        txtHuespedDoc.setText("");
+        txtHuespedNombre.setText("");
+        txtHuespedTel.setText("");
+        txtHuespedCorreo.setText("");
+        modeloOcupantesHuesped.setRowCount(0);
+    }
+
+    private void mostrarDetalleHuespedYOcupantes() {
+        int fila = tablaHuespedes.getSelectedRow();
+        if (fila < 0) {
+            limpiarDetalleHuespedYOcupantes();
+            return;
+        }
+        String idReserva = (String) modeloHuespedes.getValueAt(fila, 0);
+        Reserva r = alojamiento.buscarReserva(idReserva);
+        if (r == null) return;
+
+        Titular t = r.getInfoTitular();
+        String tipoRegistro = r.getEstadoReserva() == EstadoReserva.EN_CURSO
+                ? "HOSPEDADO ACTUALMENTE"
+                : (r.getEstadoReserva().esActiva() ? "RESERVA ACTIVA" : "HISTORIAL");
+
+        lblInfoEstadiaHuesped.setText(tipoRegistro + " | Reserva: " + r.getIdReserva()
+                + " | Apto: " + r.getApartamento().getIdApartamento()
+                + " (" + r.getFechaEntrada() + " a " + r.getFechaSalida() + ")");
+
+        txtHuespedDoc.setText(t.getIdUsuario());
+        txtHuespedNombre.setText(t.getNombreUsuario());
+        txtHuespedTel.setText(t.getTelefonoUsuario());
+        txtHuespedCorreo.setText(t.getCorreoUsuario());
+
+        modeloOcupantesHuesped.setRowCount(0);
+        ArrayList<Ocupante> ocupantes = r.getListOcupantes();
+        for (int i = 0; i < ocupantes.size(); i++) {
+            Ocupante oc = ocupantes.get(i);
+            int edad = Period.between(oc.getFechaNacOcupante(), r.getFechaEntrada()).getYears();
+            String tarifa = oc.pagaTarifa(r.getFechaEntrada()) ? "Paga tarifa" : "Menor < 6 años (Gratis)";
+            modeloOcupantesHuesped.addRow(new Object[]{
+                    i + 1,
+                    oc.getNombreOcupante(),
+                    oc.getFechaNacOcupante(),
+                    edad + " años",
+                    tarifa
+            });
+        }
+    }
+
+    private void guardarDatosTitularSeleccionado() {
+        String doc = txtHuespedDoc.getText().trim();
+        if (doc.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Seleccione un huésped de la lista.", "Atención", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (alojamiento.actualizarDatosTitular(doc, txtHuespedNombre.getText(),
+                txtHuespedCorreo.getText(), txtHuespedTel.getText())) {
+            JOptionPane.showMessageDialog(this, "Datos del huésped titular actualizados correctamente.");
+            refrescarTodo();
+        } else {
+            JOptionPane.showMessageDialog(this, "Verifique que nombre, teléfono y correo no estén vacíos.", "Datos Inválidos", JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    private void agregarOcupanteAReservaSeleccionada() {
+        int fila = tablaHuespedes.getSelectedRow();
+        if (fila < 0) {
+            JOptionPane.showMessageDialog(this, "Seleccione una reserva/estadía de la lista.", "Atención", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        String idReserva = (String) modeloHuespedes.getValueAt(fila, 0);
+        Reserva r = alojamiento.buscarReserva(idReserva);
+        if (r == null) return;
+
+        if (!r.getEstadoReserva().esActiva()) {
+            JOptionPane.showMessageDialog(this, "No se pueden modificar ocupantes de una estadía en el historial (" + r.getEstadoReserva() + ").", "Solo Lectura", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        try {
+            String nombre = txtNuevoOcupNombre.getText().trim();
+            LocalDate fechaNac = LocalDate.parse(txtNuevoOcupFechaNac.getText().trim());
+            Ocupante nuevo = new Ocupante(nombre, fechaNac);
+
+            if (!nuevo.esValido()) {
+                JOptionPane.showMessageDialog(this, "Ingrese un nombre y fecha de nacimiento válidos.", "Datos Inválidos", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            if (r.agregarOcupante(nuevo)) {
+                txtNuevoOcupNombre.setText("");
+                txtNuevoOcupFechaNac.setText("");
+                actualizarTablaHuespedes();
+                JOptionPane.showMessageDialog(this, "Ocupante agregado correctamente.");
+            } else {
+                JOptionPane.showMessageDialog(this, "Se alcanzó la capacidad máxima del apartamento ("
+                        + r.getApartamento().getCapacidaMaxPersonas() + " personas).", "Capacidad Máxima", JOptionPane.WARNING_MESSAGE);
+            }
+        } catch (DateTimeParseException ex) {
+            JOptionPane.showMessageDialog(this, "Fecha de nacimiento inválida. Use formato YYYY-MM-DD.", "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void quitarOcupanteDeReservaSeleccionada() {
+        int filaReserva = tablaHuespedes.getSelectedRow();
+        int filaOcupante = tablaOcupantesHuesped.getSelectedRow();
+        if (filaReserva < 0 || filaOcupante < 0) {
+            JOptionPane.showMessageDialog(this, "Seleccione la estadía y el ocupante que desea quitar.", "Atención", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        String idReserva = (String) modeloHuespedes.getValueAt(filaReserva, 0);
+        Reserva r = alojamiento.buscarReserva(idReserva);
+        if (r == null) return;
+
+        if (!r.getEstadoReserva().esActiva()) {
+            JOptionPane.showMessageDialog(this, "No se pueden modificar ocupantes de una estadía en el historial.", "Solo Lectura", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        if (r.eliminarOcupante(filaOcupante)) {
+            actualizarTablaHuespedes();
+            JOptionPane.showMessageDialog(this, "Ocupante retirado de la estadía.");
+        } else {
+            JOptionPane.showMessageDialog(this, "La reserva debe conservar al menos un ocupante.", "Operación no permitida", JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
     private void dialogoRegistroRapidoTitular() {
         JTextField doc = new JTextField();
         JTextField nombre = new JTextField();
         JTextField tel = new JTextField();
         JTextField correo = new JTextField();
-        JTextField nac = new JTextField("1992-01-01");
+        JTextField nac = new JTextField();
 
         Object[] campos = {
                 "Documento:", doc, "Nombre completo:", nombre,
@@ -236,25 +695,19 @@ public class PanelRecepcionista extends JPanel {
                 Titular t = new Titular(nombre.getText(), doc.getText(), correo.getText(), tel.getText(), "1234", LocalDate.parse(nac.getText().trim()), "");
                 if (t.esValido() && alojamiento.registrarUsuario(t)) {
                     txtDocTitular.setText(t.getIdUsuario());
-                    JOptionPane.showMessageDialog(this, "Titular registrado (clave por defecto: 1234).");
+                    int incluir = JOptionPane.showConfirmDialog(this,
+                            "Titular registrado (clave por defecto: 1234).\n¿Desea incluirlo también en la lista de ocupantes de la reserva?",
+                            "Incluir Titular como Ocupante", JOptionPane.YES_NO_OPTION);
+                    if (incluir == JOptionPane.YES_OPTION) {
+                        incluirTitularComoOcupante();
+                    }
                 } else {
                     JOptionPane.showMessageDialog(this, "Datos inválidos o documento ya existente.", "Error", JOptionPane.ERROR_MESSAGE);
                 }
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Fecha inválida.", "Error", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Fecha inválida (use YYYY-MM-DD).", "Error", JOptionPane.ERROR_MESSAGE);
             }
         }
-    }
-
-    private ArrayList<Ocupante> construirListaOcupantesRecepcion(int adultos, int menores) {
-        ArrayList<Ocupante> ocupantes = new ArrayList<>();
-        for (int i = 1; i <= adultos; i++) {
-            ocupantes.add(new Ocupante("Adulto " + i, LocalDate.of(1990, 1, 1)));
-        }
-        for (int i = 1; i <= menores; i++) {
-            ocupantes.add(new Ocupante("Menor " + i, LocalDate.now().minusYears(3)));
-        }
-        return ocupantes;
     }
 
     private String construirTextoCotizacionRecepcion(Apartamento apto, LocalDate entrada, LocalDate salida,
@@ -273,9 +726,18 @@ public class PanelRecepcionista extends JPanel {
     private void cotizarEstanciaRecepcion() {
         try {
             String codApto = txtCodApto.getText().trim();
+            if (codApto.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Ingrese el código del apartamento a cotizar.", "Campo Requerido", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
             Apartamento apto = alojamiento.buscarApartamento(codApto);
             if (apto == null) {
                 JOptionPane.showMessageDialog(this, "Apartamento no encontrado o inactivo.", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            if (txtEntrada.getText().trim().isEmpty() || txtSalida.getText().trim().isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Ingrese las fechas de entrada y salida (YYYY-MM-DD).", "Fechas Requeridas", JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
@@ -286,22 +748,19 @@ public class PanelRecepcionista extends JPanel {
                 return;
             }
 
-            int adultos = Integer.parseInt(txtCantAdultos.getText().trim());
-            int menores = Integer.parseInt(txtCantMenores.getText().trim());
-            if (adultos < 0 || menores < 0 || (adultos + menores) == 0) {
-                JOptionPane.showMessageDialog(this, "Debe indicar al menos un ocupante válido.", "Ocupantes Inválidos", JOptionPane.WARNING_MESSAGE);
+            if (ocupantesReservaNueva.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Debe registrar al menos un ocupante en la lista antes de cotizar.", "Ocupantes Requeridos", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            if ((adultos + menores) > apto.getCapacidaMaxPersonas()) {
-                JOptionPane.showMessageDialog(this, "La cantidad de ocupantes (" + (adultos + menores)
+            if (ocupantesReservaNueva.size() > apto.getCapacidaMaxPersonas()) {
+                JOptionPane.showMessageDialog(this, "La cantidad de ocupantes (" + ocupantesReservaNueva.size()
                         + ") excede la capacidad máxima del apartamento (" + apto.getCapacidaMaxPersonas() + ").", "Capacidad Excedida", JOptionPane.WARNING_MESSAGE);
                 return;
             }
 
             Canal canal = (Canal) cbCanal.getSelectedItem();
-            ArrayList<Ocupante> ocupantes = construirListaOcupantesRecepcion(adultos, menores);
             boolean disponible = alojamiento.validarDisponibilidad(codApto, entrada, salida);
-            String textoCotizacion = construirTextoCotizacionRecepcion(apto, entrada, salida, ocupantes, canal, disponible)
+            String textoCotizacion = construirTextoCotizacionRecepcion(apto, entrada, salida, ocupantesReservaNueva, canal, disponible)
                     + "\n¿El huésped acepta la cotización para crear la reserva?";
 
             JTextArea area = new JTextArea(textoCotizacion, 14, 58);
@@ -321,10 +780,10 @@ public class PanelRecepcionista extends JPanel {
                 JOptionPane.showMessageDialog(this, new JScrollPane(area),
                         "Cotización — Apartamento No Disponible", JOptionPane.WARNING_MESSAGE);
             }
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Cantidad de adultos o menores inválida.", "Error", JOptionPane.ERROR_MESSAGE);
+        } catch (DateTimeParseException ex) {
+            JOptionPane.showMessageDialog(this, "Revise el formato de fechas (YYYY-MM-DD).", "Error", JOptionPane.ERROR_MESSAGE);
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Revise el formato de fechas (YYYY-MM-DD): " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Error al cotizar: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -332,19 +791,21 @@ public class PanelRecepcionista extends JPanel {
         try {
             String docTit = txtDocTitular.getText().trim();
             String codApto = txtCodApto.getText().trim();
+            if (docTit.isEmpty() || codApto.isEmpty()
+                    || txtEntrada.getText().trim().isEmpty() || txtSalida.getText().trim().isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Complete documento del titular, código de apartamento y fechas.", "Campos Incompletos", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            if (ocupantesReservaNueva.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Debe registrar al menos un ocupante en la lista de ocupantes.", "Ocupantes Requeridos", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
             Canal canal = (Canal) cbCanal.getSelectedItem();
             LocalDate entrada = LocalDate.parse(txtEntrada.getText().trim());
             LocalDate salida = LocalDate.parse(txtSalida.getText().trim());
             String codExt = txtCodExterno.getText().trim();
-            int adultos = Integer.parseInt(txtCantAdultos.getText().trim());
-            int menores = Integer.parseInt(txtCantMenores.getText().trim());
-
-            if (adultos < 0 || menores < 0 || (adultos + menores) == 0) {
-                JOptionPane.showMessageDialog(this, "Debe registrar al menos un ocupante válido.", "Error", JOptionPane.WARNING_MESSAGE);
-                return;
-            }
-
-            ArrayList<Ocupante> ocupantes = construirListaOcupantesRecepcion(adultos, menores);
 
             if (solicitarConfirmacion) {
                 Apartamento apto = alojamiento.buscarApartamento(codApto);
@@ -352,8 +813,13 @@ public class PanelRecepcionista extends JPanel {
                     JOptionPane.showMessageDialog(this, "Apartamento no encontrado o inactivo.", "Error", JOptionPane.ERROR_MESSAGE);
                     return;
                 }
+                if (ocupantesReservaNueva.size() > apto.getCapacidaMaxPersonas()) {
+                    JOptionPane.showMessageDialog(this, "La cantidad de ocupantes (" + ocupantesReservaNueva.size()
+                            + ") excede la capacidad máxima del apartamento (" + apto.getCapacidaMaxPersonas() + ").", "Capacidad Excedida", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
                 boolean disponible = alojamiento.validarDisponibilidad(codApto, entrada, salida);
-                String textoConfirmacion = construirTextoCotizacionRecepcion(apto, entrada, salida, ocupantes, canal, disponible)
+                String textoConfirmacion = construirTextoCotizacionRecepcion(apto, entrada, salida, ocupantesReservaNueva, canal, disponible)
                         + "\n¿El huésped acepta esta cotización para confirmar la reserva?";
 
                 JTextArea area = new JTextArea(textoConfirmacion, 14, 58);
@@ -367,13 +833,18 @@ public class PanelRecepcionista extends JPanel {
                 }
             }
 
-            Reserva r = alojamiento.crearReserva(docTit, codApto, ocupantes, entrada, salida, canal, codExt);
-            String msg = "Reserva creada con ID: " + r.getIdReserva() + "\nTotal congelado: $" + r.getValorTotalCongelado() + " COP";
+            Reserva r = alojamiento.crearReserva(docTit, codApto, ocupantesReservaNueva, entrada, salida, canal, codExt);
+            String msg = "Reserva creada con ID: " + r.getIdReserva()
+                    + "\nOcupantes registrados: " + r.getListOcupantes().size()
+                    + "\nTotal congelado: $" + r.getValorTotalCongelado() + " COP";
             if (canal == Canal.EXTERNA) {
                 msg += "\nComisión plataforma (15%): $" + r.getComisionPlataforma() + " COP";
             }
             JOptionPane.showMessageDialog(this, msg);
+            limpiarFormularioReserva();
             refrescarTodo();
+        } catch (DateTimeParseException ex) {
+            JOptionPane.showMessageDialog(this, "Revise el formato de fechas (YYYY-MM-DD).", "Error", JOptionPane.ERROR_MESSAGE);
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(), "No se pudo registrar", JOptionPane.ERROR_MESSAGE);
         }
@@ -595,23 +1066,30 @@ public class PanelRecepcionista extends JPanel {
     }
 
     public void refrescarTodo() {
-        modeloReservas.setRowCount(0);
-        for (Reserva r : alojamiento.getListReservas()) {
-            modeloReservas.addRow(new Object[]{
-                    r.getIdReserva(), r.getInfoTitular().getNombreUsuario(), r.getApartamento().getIdApartamento(),
-                    r.getFechaEntrada(), r.getFechaSalida(), r.getCanal(), r.getCodigoExterno(),
-                    r.getEstadoReserva(), "$" + r.getValorTotalCongelado(), "$" + r.getFolio().calcularSaldoPendiente()
-            });
-        }
-
-        modeloAptos.setRowCount(0);
-        for (Apartamento a : alojamiento.getListApartamentos()) {
-            if (a.isActivo()) {
-                modeloAptos.addRow(new Object[]{
-                        a.getIdApartamento(), a.getNombreApartamento(), a.getCapacidaMaxPersonas(),
-                        a.getEstadoOperativo(), a.getMotivoFueraServicio(), a.getListNovedades().size()
+        actualizandoTablas = true;
+        try {
+            modeloReservas.setRowCount(0);
+            for (Reserva r : alojamiento.getListReservas()) {
+                modeloReservas.addRow(new Object[]{
+                        r.getIdReserva(), r.getInfoTitular().getNombreUsuario(), r.getApartamento().getIdApartamento(),
+                        r.getFechaEntrada(), r.getFechaSalida(), r.getCanal(), r.getCodigoExterno(),
+                        r.getEstadoReserva(), "$" + r.getValorTotalCongelado(), "$" + r.getFolio().calcularSaldoPendiente()
                 });
             }
+
+            modeloAptos.setRowCount(0);
+            for (Apartamento a : alojamiento.getListApartamentos()) {
+                if (a.isActivo()) {
+                    modeloAptos.addRow(new Object[]{
+                            a.getIdApartamento(), a.getNombreApartamento(), a.getCapacidaMaxPersonas(),
+                            a.getEstadoOperativo(), a.getMotivoFueraServicio(), a.getListNovedades().size()
+                    });
+                }
+            }
+
+            actualizarTablaHuespedes();
+        } finally {
+            actualizandoTablas = false;
         }
     }
 }

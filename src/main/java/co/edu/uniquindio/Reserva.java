@@ -47,6 +47,21 @@ public class Reserva {
         return fechaEntrada.isBefore(fin) && fechaSalida.isAfter(inicio);
     }
 
+    public boolean agregarOcupante(Ocupante ocupante) {
+        if (!estadoReserva.esActiva()) return false;
+        if (ocupante == null || !ocupante.esValido()) return false;
+        if (listOcupantes.size() >= apartamento.getCapacidaMaxPersonas()) return false;
+        return listOcupantes.add(ocupante);
+    }
+
+    public boolean eliminarOcupante(int indice) {
+        if (!estadoReserva.esActiva()) return false;
+        if (listOcupantes.size() <= 1) return false;
+        if (indice < 0 || indice >= listOcupantes.size()) return false;
+        listOcupantes.remove(indice);
+        return true;
+    }
+
     public boolean cambiarEstado(EstadoReserva nuevoEstado) {
         if (this.estadoReserva == nuevoEstado) return true;
 
