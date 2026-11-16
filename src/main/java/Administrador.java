@@ -1,79 +1,35 @@
-import java.util.ArrayList;
+package co.edu.uniquindio;
 
 public class Administrador extends Usuario {
-    private ArrayList<Recepcionista> listRecepcionistas;
-    private ArrayList<Apartamento> listApartamentos;
-    private ArrayList<Temporada> listTemporadas;
 
-    // Consructor
-    public Administrador(String nombreUsuario, String idUsuario, String correoUsuario, String telefonoUsuario, String contraseniaUsuario,
-                         ArrayList<Recepcionista> listRecepcionistas, ArrayList<Apartamento> listApartamentos, ArrayList<Temporada> listTemporadas) {
+    public Administrador(String nombreUsuario, String idUsuario, String correoUsuario,
+                         String telefonoUsuario, String contraseniaUsuario) {
         super(nombreUsuario, idUsuario, correoUsuario, telefonoUsuario, contraseniaUsuario);
-        this.listRecepcionistas = new ArrayList<>();
-        this.listApartamentos = new ArrayList<>();
-        this.listTemporadas = new ArrayList<>();
     }
 
     @Override
-    public boolean esValido() {
-        return super.esValido();
+    public String getRol() {
+        return "ADMINISTRADOR";
     }
 
-    public ArrayList<Recepcionista> getListRecepcionistas() {
-        return new ArrayList<>(listRecepcionistas);
+    public boolean contratarRecepcionista(Alojamiento alojamiento, Recepcionista recepcionista) {
+        return alojamiento != null && alojamiento.registrarUsuario(recepcionista);
     }
 
-    public ArrayList<Apartamento> getListApartamentos() {
-        return new ArrayList<>(listApartamentos);
+    public boolean editarRecepcionista(Alojamiento alojamiento, String idRecepcionista, String nombre,
+                                       String correo, String telefono, String contrasenia) {
+        return alojamiento != null && alojamiento.actualizarRecepcionista(idRecepcionista, nombre, correo, telefono, contrasenia);
     }
 
-    public ArrayList<Temporada> getListTemporadas() {
-        return new ArrayList<>(listTemporadas);
+    public boolean desvincularRecepcionista(Alojamiento alojamiento, String idRecepcionista) {
+        return alojamiento != null && alojamiento.desvincularRecepcionista(idRecepcionista);
     }
 
-    public boolean crearRecepcionista(Recepcionista recepcionista) {
-        boolean registrado = false;
-        if (recepcionista != null && recepcionista.esValido() && buscarRecepcionista(recepcionista.getIdUsuario()) == null) {
-            listRecepcionistas.add(recepcionista);
-            registrado = true;
-        }
-        return registrado;
+    public boolean crearApartamento(Alojamiento alojamiento, Apartamento apartamento) {
+        return alojamiento != null && alojamiento.registrarApartamento(apartamento);
     }
 
-    public Recepcionista buscarRecepcionista(String idRecepcionista) {
-        Recepcionista encontrado = null;
-        if (idRecepcionista != null) {
-            for (Recepcionista recepcionista : listRecepcionistas) {
-                if (recepcionista.getIdUsuario().equals(idRecepcionista.trim())) {
-                    encontrado = recepcionista;
-                }
-            }
-        }
-        return encontrado;
+    public boolean eliminarApartamentoLogico(Alojamiento alojamiento, String idApartamento) {
+        return alojamiento != null && alojamiento.eliminarApartamentoLogico(idApartamento);
     }
-
-    public boolean actualizarRecepcionista(String idRecepcionista, String nombreNuevo, String correoNuevo, String telefonoNuevo, String contraseniaNueva) {
-        boolean actualizado = false;
-        Recepcionista recepcionista = buscarRecepcionista(idRecepcionista);
-        if (recepcionista != null) {
-            recepcionista.setNombreUsuario(nombreNuevo);
-            recepcionista.setCorreoUsuario(correoNuevo);
-            recepcionista.setTelefonoUsuario(telefonoNuevo);
-            recepcionista.setContraseniaUsuario(contraseniaNueva);
-            actualizado = true;
-        }
-        return actualizado;
-    }
-
-    public boolean eliminarRecepcionista(String idRecepcionista) {
-        boolean eliminado = false;
-        Recepcionista recepcionista = buscarRecepcionista(idRecepcionista);
-        if (recepcionista != null && recepcionista) {
-            listRecepcionistas.remove(recepcionista);
-            eliminado = true;
-        }
-        return eliminado;
-
-    }
-
 }

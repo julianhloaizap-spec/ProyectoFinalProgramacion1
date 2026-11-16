@@ -1,53 +1,64 @@
+package co.edu.uniquindio;
+
 import java.time.LocalDate;
+import java.time.Period;
 import java.util.ArrayList;
 
 public class Titular extends Usuario implements IReservable {
-
-    //Atributos
     private LocalDate fechaNacTitular;
     private String fotoTitular;
-    private ArrayList<Ocupante> listOcupantes;
-    private ArrayList<Reserva> listReservas;
+    private final ArrayList<Ocupante> listOcupantes;
+    private final ArrayList<Reserva> listReservas;
 
-    //constructor
     public Titular(String nombreUsuario, String idUsuario, String correoUsuario, String telefonoUsuario,
-                   String contraseniaUsuario, LocalDate fechaNacTitular, String fotoTitular, ArrayList<Ocupante> listOcupantes, ArrayList<Reserva>) {
+                   String contraseniaUsuario, LocalDate fechaNacTitular, String fotoTitular) {
         super(nombreUsuario, idUsuario, correoUsuario, telefonoUsuario, contraseniaUsuario);
         this.fechaNacTitular = fechaNacTitular;
-        this.fotoTitular = fotoTitular;
+        this.fotoTitular = fotoTitular != null ? fotoTitular : "";
         this.listOcupantes = new ArrayList<>();
+        this.listReservas = new ArrayList<>();
+    }
+
+    @Override
+    public String getRol() {
+        return "HUESPED";
     }
 
     @Override
     public boolean esValido() {
-        return super.esValido();
+        if (!super.esValido() || fechaNacTitular == null) return false;
+        return Period.between(fechaNacTitular, LocalDate.now()).getYears() >= 18;
     }
 
-    //getters and setters
-    public LocalDate getFechaNacTitular() {
-        return fechaNacTitular;
-    }
-
-    public boolean setFechaNacTitular() {
-        boolean validado = fechaNacTitular != null && !fechaNacTitular.plusYears(18).isAfter(LocalDate.now());
-        if (validado) {
-            this.fechaNacTitular = fechaNacTitular;
+    public void agregarOcupante(Ocupante ocupante) {
+        if (ocupante != null && ocupante.esValido()) {
+            listOcupantes.add(ocupante);
         }
-        return validado;
     }
 
-    public String getFotoTitular() {
-        return fotoTitular;
+    public void limpiarOcupantes() {
+        listOcupantes.clear();
     }
-
-    public ArrayList<Ocupante> getListOcupantes() {
-        return new ArrayList<>(listOcupantes);
-    }
-
 
     @Override
-    public Reserva registrarReserva(String idReserva, LocalDate fechaReserva, Titular infoTitular,
-                                    EstadoReserva estadoReserva, LocalDate fechaEntrada, LocalDate fechaSalida) {
-        return null;
+    public Reserva registrarReserva(Apartamento apartamento, Titular infoTitular,
+                                    ArrayList<Ocupante> ocupantes, LocalDate fechaEntrada,
+                                    LocalDate fechaSalida, Canal canal, String codigoExterno) {
+        Reserva reserva = new Reserva(infoTitular, apartamento, ocupantes, fechaEntrada, fechaSalida, canal, codigoExterno);
+        listReservas.add(reserva);
+        return reserva;
     }
+
+    public void asociarReserva(Reserva reserva) {
+        if (reserva != null && !listReservas.contains(reserva)) {
+            listReservas.add(reserva);
+        }
+    }
+
+    public LocalDate getFechaNacTitular() { return fechaNacTitular; }
+    public void setFechaNacTitular(LocalDate fechaNacTitular) { this.fechaNacTitular = fechaNacTitular; }
+    public String getFotoTitular() { return fotoTitular; }
+    public void setFotoTitular(String fotoTitular) { this.fotoTitular = fotoTitular != null ? fotoTitular : ""; }
+    public ArrayList<Ocupante> getListOcupantes() { return new ArrayList<>(listOcupantes); }
+    public ArrayList<Reserva> getListReservas() { return new ArrayList<>(listReservas); }
 }
